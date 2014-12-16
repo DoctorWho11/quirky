@@ -9,11 +9,11 @@ AM_SILENT_RULES([yes])
 LT_INIT([disable-static])
 
 # Package requirements
-PKG_CHECK_MODULES([GOBJECT], [gobject-2.0 >= 2.38.0])
-PKG_CHECK_MODULES([GIO], [gio-2.0 >= 2.38.0])
+PKG_CHECK_MODULES([GOBJECT], [gobject-2.0 >= 2.40.0])
+PKG_CHECK_MODULES([GIO], [gio-2.0 >= 2.40.0])
 
 # Because we target Linux.
-PKG_CHECK_MODULES([GIO_UNIX], [gio-unix-2.0 >= 2.38.0])
+PKG_CHECK_MODULES([GIO_UNIX], [gio-unix-2.0 >= 2.40.0])
 
 AC_CONFIG_MACRO_DIR([m4])
 
