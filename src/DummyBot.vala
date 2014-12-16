@@ -7,6 +7,9 @@
  * on IRC in Vala. It will survive here a little longer to ensure we never
  * actually end up with an end project looking anything like this.
  *
+ * Updated note: Various utility functions will be developed here first before
+ * being split into something more intelligent.
+ *
  * Cue rant:
  *
  * Down below you may still see (depending on how much I alter this file) fixed
@@ -43,6 +46,7 @@ public class DummyBot
     SocketConnection? conn;
     DataInputStream? dis;
     DataOutputStream? dos;
+    IrcIdentity ident;
 
     public void connect(string host, uint16 port)
     {
@@ -90,7 +94,7 @@ public class DummyBot
         dos = new DataOutputStream(conn.output_stream);
 
         /* Ported from my C version. Structs are lighter anyway */
-        IrcIdentity ident = IrcIdentity() {
+        ident = IrcIdentity() {
             nick = "ikeytestbot",
             username = "TestBot",
             gecos = "Test Bot",
@@ -107,9 +111,9 @@ public class DummyBot
         size_t length; // future validation
         try {
             while ((line = dis.read_line(out length)) != null) {
-                stdout.printf("Line: %s\n", line);
+                handle_line(line);
 
-                /* HOW NOT TO IRC. See? Its evil. Imagine, PRIVMSG with a 001 .. -_- */
+                /* HOW NOT TO IRC. See? Its evil. Imagine, PRIVMSG with a 001 .. -_- 
                 if ("001" in line) {
                     write_socket("JOIN %s\r\n", ident.default_channel);
                 }
@@ -122,11 +126,105 @@ public class DummyBot
                 // still prefer printf formatting.
                 if (@"PRIVMSG $(ident.default_channel)" in line && "GOHOME" in line) {
                     write_socket("QUIT :Buggering off\r\n");
-                }
+                }*/
             }
         } catch (Error e) {
             message("I/O error read: %s", e.message);
         }
+    }
+
+    /**
+     * Determine if we have a numeric string or not
+     *
+     * @param input String to check
+     *
+     * @returns a boolean, true if the input is numeric, otherwise false
+     */
+    bool is_number(string input)
+    {
+        bool numeric = false;
+        for (int i=0; i<input.length; i++) {
+            char c = (char)input.get_char(i);
+            numeric = c.isdigit();
+            if (!numeric) {
+                return numeric;
+            }
+        }
+        return numeric;
+    }
+
+    /**
+     * Pre-process line from server and dispatch for numeric or command handlers
+     *
+     * @param input The input line from the server
+     */
+    void handle_line(string input)
+    {
+        var line = input;
+        if (line.has_suffix("\r")) {
+            line = line.substring(0, line.length-1);
+        }
+        string[] segments = line.split(" ");
+        if (segments.length < 2) {
+            warning("IRC server appears to be on crack.");
+            return;
+        }
+        /* Sender is a special case, can sometimes be a command.. */
+        string sender = segments[0];
+        if (!sender.has_prefix(":")) {
+            /* Special command */
+            handle_command(sender, line, true);
+        } else {
+            string command = segments[1];
+            if (is_number(command)) {
+                var number = int.parse(command);
+                handle_numeric(number, line);
+            } else {
+                handle_command(command, line);
+            }
+        }
+        stdout.printf("%s\n", line);
+    }
+
+    /**
+     * Handle a numeric response from the server
+     *
+     * @param numeric The numeric from the server
+     * @param line The unprocessed line
+     */
+    void handle_numeric(int numeric, string line)
+    {
+        /* TODO: Support all RFC numerics */
+        switch (numeric) {
+            case 001:
+                write_socket("JOIN %s\r\n", ident.default_channel);
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * Handle a command from the server (string)
+     *
+     * @param command The command name
+     * @param line The unprocessed line
+     * @param special Whether this is a special case, like PING or ERROR
+     */
+    void handle_command(string command, string line, bool special = false)
+    {
+        if (special) {
+            switch (command) {
+                case "PING":
+                    var send = line.replace("PING", "PONG");
+                    write_socket("%s\r\n", send);
+                    return;
+                default:
+                    /* Error, etc, not yet supported */
+                    return;
+            }
+        }
+        /* TODO: Support all RFC commands */
     }
 }
 
