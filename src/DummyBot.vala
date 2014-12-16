@@ -40,6 +40,12 @@ public struct IrcIdentity {
     int mode;
 }
 
+public struct IrcUser {
+    string nick;
+    string username;
+    string hostname;
+}
+
 public class DummyBot
 {
     SocketClient? client;
@@ -171,16 +177,20 @@ public class DummyBot
         }
         /* Sender is a special case, can sometimes be a command.. */
         string sender = segments[0];
+
+        /* Speed up processing elsewhere.. */
+        string? remnant = segments.length > 2  ? string.joinv(" ", segments[2:segments.length]) : null;
+
         if (!sender.has_prefix(":")) {
             /* Special command */
-            handle_command(sender, line, true);
+            handle_command(sender, sender, line, remnant, true);
         } else {
             string command = segments[1];
             if (is_number(command)) {
                 var number = int.parse(command);
-                handle_numeric(number, line);
+                handle_numeric(sender, number, line, remnant);
             } else {
-                handle_command(command, line);
+                handle_command(sender, command, line, remnant);
             }
         }
         stdout.printf("%s\n", line);
@@ -189,10 +199,12 @@ public class DummyBot
     /**
      * Handle a numeric response from the server
      *
+     * @param sender Originator of message
      * @param numeric The numeric from the server
      * @param line The unprocessed line
+     * @param remnant Remainder of processed line
      */
-    void handle_numeric(int numeric, string line)
+    void handle_numeric(string sender, int numeric, string line, string? remnant)
     {
         /* TODO: Support all RFC numerics */
         switch (numeric) {
@@ -207,11 +219,13 @@ public class DummyBot
     /**
      * Handle a command from the server (string)
      *
+     * @param sender Originator of message
      * @param command The command name
      * @param line The unprocessed line
+     * @param remnant Remainder of processed line
      * @param special Whether this is a special case, like PING or ERROR
      */
-    void handle_command(string command, string line, bool special = false)
+    void handle_command(string sender, string command, string line, string? remnant, bool special = false)
     {
         if (special) {
             switch (command) {
@@ -224,7 +238,74 @@ public class DummyBot
                     return;
             }
         }
+
+        switch (command) {
+            case "PRIVMSG":
+                /* Split target from remaining message */
+                var i = remnant.index_of(":");
+                if (i < 0 || i == remnant.length) {
+                    warning("Malformed %s", command);
+                    break;
+                }
+                string target = remnant.substring(0, i);
+                target = target.replace(" ", ""); // work around potentially broken systems
+                // unused
+                string message = remnant.substring(i+1);
+
+                IrcUser user = user_from_hostmask(sender);
+                sender = user.nick;
+
+                /* We need to improve our own nick handling, but basically if NICK ==
+                 * target, private message. So swap target for sender
+                 */
+                if (target == ident.nick) {
+                    target = user.nick;
+                }
+
+                // demo code, for now we'll just respond to the sender on that same target.
+                write_socket("PRIVMSG %s :Hello, %s\r\n", target, sender);
+                break;
+            default:
+                break;
+        }
         /* TODO: Support all RFC commands */
+    }
+
+    /**
+     * Parse an IRC hostmask and structure it
+     *
+     * @param hostmask Input hostmask (nick!user@host)
+     *
+     * @returns An IrcUser if the hostmask is valid, or a dummy ircuser
+     */
+    protected IrcUser? user_from_hostmask(string hostmaskin)
+    {
+        IrcUser ret = IrcUser() {
+            nick = "user",
+            username = "user",
+            hostname = "host"
+        };
+
+        string hostmask = hostmaskin;
+        if (hostmask.has_prefix(":")) {
+            hostmask = hostmask.substring(1);
+        }
+
+        int bi, ba;
+        if ((bi = hostmask.index_of("!")) < 0) {
+            return ret;
+        }
+        if ((ba = hostmask.index_of("@")) < 0) {
+            return ret;
+        }
+        if (bi > ba || bi+1 > hostmask.length || ba+1 > hostmask.length) {
+            return ret;
+        }
+
+        ret.nick = hostmask.substring(0, bi);
+        ret.username = hostmask.substring(bi+1, (ba-bi)-1);
+        ret.hostname = hostmask.substring(ba+1);
+        return ret;
     }
 }
 
