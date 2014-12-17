@@ -15,6 +15,8 @@ public class DummyBot
     IrcIdentity ident;
     IrcCore irc;
 
+    static string BOT_PREFIX = "!";
+
     public DummyBot()
     {
         ident = IrcIdentity() {
@@ -58,8 +60,16 @@ public class DummyBot
     public void on_messaged(IrcUser user, string target, string message)
     {
         // DEMO: Send message back (PM or channel depending on target)
-        string who = target == ident.nick ? user.nick : target;
-        irc.send_message(who, @"Hello, $(user.nick)");
+        if (target == ident.nick) {
+            irc.send_message(user.nick, @"Hello, and thanks for the PM $(user.nick)");
+        } else {
+            /* Only if we got mentioned.. */
+            if (ident.nick in message) {
+                irc.send_message(target, @"Wha? Who dere? Whatcha want $(user.nick)??");
+            } else if (message.has_prefix(BOT_PREFIX)) {
+                irc.send_message(target, @"LOL $(user.nick) thought we was a real bot.");
+            }
+        }
     }
 
     
