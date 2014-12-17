@@ -62,8 +62,7 @@ public class IrcCore
     SocketConnection? conn;
     IrcIdentity ident;
     IOChannel? iochannel;
-
-    Queue<string> queue;
+    DataOutputStream dos;
 
     public signal void joined_channel(IrcUser user, string channel);
     public signal void user_quit(IrcUser user, string quit_msg);
@@ -92,7 +91,6 @@ public class IrcCore
     {
         /* Todo: Validate */
         this.ident = ident;
-        this.queue = new Queue<string>();
     }
 
     public void connect(string host, uint16 port)
@@ -110,18 +108,19 @@ public class IrcCore
                 this.conn = connection;
                 this.client = client;
             }
+            connection.socket.set_blocking(false);
             iochannel = new IOChannel.unix_new(connection.socket.fd);
             if (iochannel == null) {
                 error("Unable to construct IOChannel!");
                 return;
             }
 
-            /* Keep these in the buffer ready to write immediately */
+            dos = new DataOutputStream(connection.output_stream);
+            /* Attempt identification immediately, get the ball rolling */
             write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
             write_socket("NICK %s\r\n", ident.nick);
 
             iochannel.add_watch(IOCondition.IN | IOCondition.HUP, handle_io_in);
-            iochannel.add_watch(IOCondition.OUT | IOCondition.HUP, handle_io_out);
         } catch (Error e) {
             message(e.message);
         }
@@ -158,37 +157,16 @@ public class IrcCore
         return true;
     }
 
-    protected bool handle_io_out(IOChannel source, IOCondition condition)
-    {
-        if ((condition & IOCondition.HUP) == IOCondition.HUP) {
-            stdout.printf("Socket died\n");
-            disconnected();
-            return false;
-        }
-
-        /* Only write what is in the queue.. */
-        if (queue.get_length() > 0) {
-            string output = queue.pop_head();
-            size_t len;
-            try {
-                source.write_chars((char[])output, out len);
-                source.flush();
-            } catch (Error e) {
-                warning("I/O failure! %s", e.message);
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     protected void write_socket(string fmt, ...)
     {
         va_list va = va_list();
         string res = fmt.vprintf(va);
 
-        /* Let this be popped later. */
-        queue.push_tail(res);
+        try {
+            dos.put_string(res);
+        } catch (Error e) {
+            warning("I/O out error: %s", e.message);
+        }
     }
 
     /**
