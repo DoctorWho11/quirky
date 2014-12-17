@@ -86,7 +86,7 @@ public class DummyBot
     
     public void run_bot()
     {
-        irc.connect("irc.freenode.net", 6667);
+        irc.connect("localhost", 6667);
         irc.irc_loop();
     }
 }
