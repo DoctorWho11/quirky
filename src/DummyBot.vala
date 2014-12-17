@@ -24,7 +24,6 @@ public class DummyBot
             username = "TestBot",
             gecos = "Test Bot",
             default_channel = "#evolveos",
-            hello_prompt = "I r testbot!",
             mode = 0
         };
         irc = new IrcCore(ident);

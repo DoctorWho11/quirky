@@ -48,7 +48,6 @@ public struct IrcIdentity {
     string gecos;
     string nick;
     string default_channel;
-    string hello_prompt;
     int mode;
 }
 
