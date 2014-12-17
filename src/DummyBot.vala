@@ -15,7 +15,7 @@ public class DummyBot
     IrcIdentity ident;
     IrcCore irc;
 
-    static string BOT_PREFIX = "!";
+    static string BOT_PREFIX = "~";
 
     public DummyBot()
     {
@@ -44,7 +44,7 @@ public class DummyBot
         irc.joined_channel.connect((u,c)=>{
             if (u.nick == ident.nick) {
                 /* For now just spam folks. */
-                irc.send_message(c, "I come in peace");
+                irc.send_message(c, "Let\'s not stand on ceremony here, Mr. Wayne..");
             } else {
                 irc.send_message(c, @"Welcome, $(u.nick)!");
             }
@@ -73,11 +73,28 @@ public class DummyBot
             if (ident.nick in message) {
                 irc.send_message(target, @"Wha? Who dere? Whatcha want $(user.nick)??");
             } else if (message.has_prefix(BOT_PREFIX)) {
-                /* lame, i know. */
-                if (message.has_prefix("%squit".printf(BOT_PREFIX))) {
-                    irc.quit("OK OK, I\'m going..");
-                } else {
-                    irc.send_message(target, @"LOL $(user.nick) thought we was a real bot.");
+                if (message.length <= 1) {
+                    irc.send_message(target, "Eh, need a proper command broski..");
+                    return;
+                }
+                string command = message.split(" ")[0].substring(1);
+
+                switch (command) {
+                    case "quit":
+                        irc.quit("OK OK, I\'m going");
+                        break;
+                    case "ping":
+                        irc.send_message(target, @"$(user.nick): PONG!");
+                        break;
+                    case "forums":
+                        irc.send_message(target, "Evolve OS Forums: https://evolve-os.com/forums/");
+                        break;
+                    case "wiki":
+                        irc.send_message(target, "Evolve OS Wiki: https://evolve-os.com/wiki");
+                        break;
+                    default:
+                        irc.send_message(target, @"LOL $(user.nick) thought we was a real bot.");
+                        break;
                 }
             }
         }
