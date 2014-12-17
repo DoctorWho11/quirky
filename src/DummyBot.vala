@@ -264,6 +264,36 @@ public class DummyBot
                     write_socket("PRIVMSG %s :Welcome, %s!\r\n", channel, user.nick);
                 }
                 break;
+            case "PART":
+                IrcUser user;
+                string rhs;
+                string[] params;
+                string channel;
+                string? reason = null;
+                /* Long story short:
+                 * PART #somechannel
+                 * PART #somechannel :Reason
+                 */
+                parse_simple(sender, remnant, out user, out params, out rhs);
+                if (params.length > 1) {
+                    warning("Invalid PART: more than one target!");
+                    break;
+                }
+                if (params.length == 1) {
+                    channel = params[0];
+                    reason = rhs;
+                } else {
+                    channel = rhs;
+                }
+                /* i.e. we didn't leave.. */
+                if (user.nick != ident.nick) {
+                    if (reason == null) {
+                        write_socket("PRIVMSG %s :Sorry to see %s go for no reason..\r\n", channel, user.nick);
+                    } else {
+                        write_socket("PRIVMSG %s :Sorry to see %s go.. (%s)\r\n", channel, user.nick, reason);
+                    }
+                }
+                break;
             default:
                 break;
         }
@@ -281,12 +311,12 @@ public class DummyBot
      */
     protected void parse_simple(string sender, string remnant, out IrcUser user, out string[]? params, out string rhs)
     {
+        user = user_from_hostmask(sender);
+
         var i = remnant.index_of(":");
         if (i < 0 || i == remnant.length) {
-            warning("Malformed parse_simple usage: %s", remnant);
-            user = {};
             params = null;
-            rhs = "";
+            rhs = remnant;
             return;
         }
 
@@ -297,7 +327,6 @@ public class DummyBot
 
         /* implementation dependent */
         rhs = remnant.substring(i+1);
-        user = user_from_hostmask(sender);
     }
 
     /**
