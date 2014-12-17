@@ -209,7 +209,7 @@ public class DummyBot
         /* TODO: Support all RFC numerics */
         switch (numeric) {
             case 001:
-                write_socket("JOIN %s\r\n", ident.default_channel);
+                join_channel(ident.default_channel);
                 break;
             default:
                 break;
@@ -251,7 +251,7 @@ public class DummyBot
                 }
                 // DEMO: Send message back (PM or channel depending on target)
                 string target = params[0] == ident.nick ? user.nick : params[0];
-                write_socket("PRIVMSG %s :Hello, %s\r\n", target, user.nick);
+                send_message(target, @"Hello, $(user.nick)");
                 break;
             case "JOIN":
                 IrcUser user;
@@ -259,9 +259,9 @@ public class DummyBot
                 parse_simple(sender, remnant, out user, null, out channel);
                 if (user.nick == ident.nick) {
                     /* For now just spam folks. */
-                    write_socket("PRIVMSG %s :I come in peace.\r\n", channel);
+                    send_message(channel, "I come in peace");
                 } else {
-                    write_socket("PRIVMSG %s :Welcome, %s!\r\n", channel, user.nick);
+                    send_message(channel, @"Welcome, $(user.nick)!");
                 }
                 break;
             case "PART":
@@ -288,9 +288,9 @@ public class DummyBot
                 /* i.e. we didn't leave.. */
                 if (user.nick != ident.nick) {
                     if (reason == null) {
-                        write_socket("PRIVMSG %s :Sorry to see %s go for no reason..\r\n", channel, user.nick);
+                        send_message(channel, @"Sorry to see $(user.nick) go for no reason..");
                     } else {
-                        write_socket("PRIVMSG %s :Sorry to see %s go.. (%s)\r\n", channel, user.nick, reason);
+                        send_message(channel, @"Sorry to see $(user.nick) go .. ($(reason))");
                     }
                 }
                 break;
@@ -371,6 +371,28 @@ public class DummyBot
         ret.username = hostmask.substring(bi+1, (ba-bi)-1);
         ret.hostname = hostmask.substring(ba+1);
         return ret;
+    }
+
+    /**
+     * Attempt to join the given IRC channel
+     * 
+     * @note No password support yet
+     * @param channel The channel to join
+     */
+    public void join_channel(string channel)
+    {
+        write_socket("JOIN %s\r\n", channel);
+    }
+
+    /**
+     * Send a message to the target
+     *
+     * @param target An online IRC nick, or a joined IRC channel
+     * @param message The message to send
+     */
+    public void send_message(string target, string message)
+    {
+        write_socket("PRIVMSG %s :%s\r\n", target, message);
     }
 }
 
