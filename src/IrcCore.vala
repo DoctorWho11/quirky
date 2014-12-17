@@ -70,6 +70,16 @@ public class IrcCore
     public signal void parted_channel(IrcUser user, string channel, string? reason);
 
     /**
+     * Someone (possibly you) was kicked from an IRC channel
+     *
+     * @param user The user who issued the kick
+     * @param channel The channel they were booted from
+     * @param whom The unlucky soul who was booted
+     * @param reason The reason they were booted
+     */
+    public signal void user_kicked(IrcUser user, string channel, string whom, string reason);
+
+    /**
      * Indicates we've established our connection to the IRC network, and have
      * recieved our welcome response
      */
@@ -281,6 +291,19 @@ public class IrcCore
                     channel = rhs;
                 }
                 parted_channel(user, channel, reason);
+                break;
+            case "KICK":
+                IrcUser user;
+                string? reason = null;
+                string[] params;
+                parse_simple(sender, remnant, out user, out params, out reason);
+
+                if (params.length != 2) {
+                    warning("Invalid KICK: Wrong parameter count!");
+                    break;
+                }
+
+                user_kicked(user, params[0], params[1], reason);
                 break;
             case "QUIT":
                 IrcUser user;
