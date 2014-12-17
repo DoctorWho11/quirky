@@ -17,7 +17,7 @@ public class DummyBot
 
     static string BOT_PREFIX = "~";
 
-    public DummyBot()
+    public DummyBot(MainLoop loop)
     {
         string default_channel = "#evolveos";
 
@@ -28,6 +28,11 @@ public class DummyBot
             mode = 0
         };
         irc = new IrcCore(ident);
+
+        irc.disconnected.connect(()=> {
+            stdout.printf("Disconnected\n");
+            loop.quit();
+        });
 
         /* Autojoin */
         irc.established.connect(()=> {
@@ -104,12 +109,13 @@ public class DummyBot
     public void run_bot()
     {
         irc.connect("localhost", 6667);
-        irc.irc_loop();
     }
 }
 
 public static void main(string[] args)
 {
-    DummyBot b = new DummyBot();
+    MainLoop loop = new MainLoop();
+    DummyBot b = new DummyBot(loop);
     b.run_bot();
+    loop.run();
 }
