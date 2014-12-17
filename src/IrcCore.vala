@@ -60,14 +60,17 @@ public class IrcCore
 {
     SocketClient? client;
     SocketConnection? conn;
-    DataInputStream? dis;
-    DataOutputStream? dos;
     IrcIdentity ident;
+    IOChannel? iochannel;
+
+    Queue<string> queue;
 
     public signal void joined_channel(IrcUser user, string channel);
     public signal void user_quit(IrcUser user, string quit_msg);
     public signal void messaged(IrcUser user, string target, string message);
     public signal void parted_channel(IrcUser user, string channel, string? reason);
+
+    public signal void disconnected();
 
     /**
      * Someone (possibly you) was kicked from an IRC channel
@@ -89,6 +92,7 @@ public class IrcCore
     {
         /* Todo: Validate */
         this.ident = ident;
+        this.queue = new Queue<string>();
     }
 
     public void connect(string host, uint16 port)
@@ -106,49 +110,85 @@ public class IrcCore
                 this.conn = connection;
                 this.client = client;
             }
+            iochannel = new IOChannel.unix_new(connection.socket.fd);
+            if (iochannel == null) {
+                error("Unable to construct IOChannel!");
+                return;
+            }
+
+            /* Keep these in the buffer ready to write immediately */
+            write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
+            write_socket("NICK %s\r\n", ident.nick);
+
+            iochannel.add_watch(IOCondition.IN | IOCondition.HUP, handle_io_in);
+            iochannel.add_watch(IOCondition.OUT | IOCondition.HUP, handle_io_out);
         } catch (Error e) {
             message(e.message);
         }
     }
 
-    protected bool write_socket(string fmt, ...)
+    protected bool handle_io_in(IOChannel source, IOCondition condition)
+    {
+        if ((condition & IOCondition.HUP) == IOCondition.HUP) {
+            stdout.printf("Socket died\n");
+            disconnected();
+            return false;
+        }
+
+        /* Read input if we have any */
+        string input;
+        size_t len;
+        IOStatus stat;
+        try {
+            stat = source.read_line(out input, out len, null);
+            if (stat == IOStatus.ERROR || stat == IOStatus.EOF) {
+                stdout.printf("Got nothing from server, SIGHUP assumed\n");
+                disconnected();
+                return false;
+            }
+            /* Happens, if we're going to block. */
+            if (input != null) {
+                handle_line(input);
+            }
+        } catch (Error e) {
+            warning("I/O failure! %s", e.message);
+            return false;
+        }
+
+        return true;
+    }
+
+    protected bool handle_io_out(IOChannel source, IOCondition condition)
+    {
+        if ((condition & IOCondition.HUP) == IOCondition.HUP) {
+            stdout.printf("Socket died\n");
+            disconnected();
+            return false;
+        }
+
+        /* Only write what is in the queue.. */
+        if (queue.get_length() > 0) {
+            string output = queue.pop_head();
+            size_t len;
+            try {
+                source.write_chars((char[])output, out len);
+                source.flush();
+            } catch (Error e) {
+                warning("I/O failure! %s", e.message);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected void write_socket(string fmt, ...)
     {
         va_list va = va_list();
         string res = fmt.vprintf(va);
 
-        try {
-            dos.put_string(res);
-        } catch (Error er) {
-            message("I/O error: %s", er.message);
-            return false;
-        }
-        return true;
-    }
-
-    public void irc_loop()
-    {
-        if (client == null || conn == null) {
-            message("No connection!");
-            return;
-        }
-        stdout.printf("Beginning irc_loop\n");
-
-        dis = new DataInputStream(conn.input_stream);
-        dos = new DataOutputStream(conn.output_stream);
-
-        // Registration. Le hackeh.
-        write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
-        write_socket("NICK %s\r\n", ident.nick);
-
-        string? line = null;
-        size_t length; // future validation
-        try {
-            while ((line = dis.read_line(out length)) != null) {
-                handle_line(line);
-            }
-        } catch (Error e) {
-            message("I/O error read: %s", e.message);
-        }
+        /* Let this be popped later. */
+        queue.push_tail(res);
     }
 
     /**
@@ -179,8 +219,9 @@ public class IrcCore
     void handle_line(string input)
     {
         var line = input;
-        if (line.has_suffix("\r")) {
-            line = line.substring(0, line.length-1);
+        /* You'd surely hope so. */
+        if (line.has_suffix("\r\n")) {
+            line = line.substring(0, line.length-2);
         }
         string[] segments = line.split(" ");
         if (segments.length < 2) {
