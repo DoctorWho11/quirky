@@ -3,6 +3,7 @@ EXTRA_DIST =
 bin_PROGRAMS = dummy-bot
 
 dummy_bot_SOURCES = \
+	IrcCore.vala \
 	DummyBot.vala
 
 dummy_bot_CFLAGS = \
