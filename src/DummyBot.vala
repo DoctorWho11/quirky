@@ -19,14 +19,21 @@ public class DummyBot
 
     public DummyBot()
     {
+        string default_channel = "#evolveos";
+
         ident = IrcIdentity() {
             nick = "ikeytestbot",
             username = "TestBot",
             gecos = "Test Bot",
-            default_channel = "#evolveos",
             mode = 0
         };
         irc = new IrcCore(ident);
+
+        /* Autojoin */
+        irc.established.connect(()=> {
+            irc.join_channel(default_channel);
+        });
+
         irc.messaged.connect(on_messaged);
 
         /* Lambdas .. ftw ? */
@@ -79,7 +86,7 @@ public class DummyBot
     
     public void run_bot()
     {
-        irc.connect("localhost", 6667);
+        irc.connect("irc.freenode.net", 6667);
         irc.irc_loop();
     }
 }

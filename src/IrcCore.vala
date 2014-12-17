@@ -47,7 +47,6 @@ public struct IrcIdentity {
     string username;
     string gecos;
     string nick;
-    string default_channel;
     int mode;
 }
 
@@ -69,6 +68,12 @@ public class IrcCore
     public signal void user_quit(IrcUser user, string quit_msg);
     public signal void messaged(IrcUser user, string target, string message);
     public signal void parted_channel(IrcUser user, string channel, string? reason);
+
+    /**
+     * Indicates we've established our connection to the IRC network, and have
+     * recieved our welcome response
+     */
+    public signal void established();
 
     public IrcCore(IrcIdentity ident)
     {
@@ -206,7 +211,7 @@ public class IrcCore
         /* TODO: Support all RFC numerics */
         switch (numeric) {
             case 001:
-                join_channel(ident.default_channel);
+                established();
                 break;
             default:
                 break;
