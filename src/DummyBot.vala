@@ -294,6 +294,13 @@ public class DummyBot
                     }
                 }
                 break;
+            case "QUIT":
+                IrcUser user;
+                string quit_msg;
+                parse_simple(sender, remnant, out user, null, out quit_msg);
+                // Wat? We don't know what channels we're on yet :p
+                stdout.printf("=> %s has quit IRC (%s)\n", user.nick, quit_msg);
+                break;
             default:
                 break;
         }
