@@ -67,7 +67,12 @@ public class DummyBot
             if (ident.nick in message) {
                 irc.send_message(target, @"Wha? Who dere? Whatcha want $(user.nick)??");
             } else if (message.has_prefix(BOT_PREFIX)) {
-                irc.send_message(target, @"LOL $(user.nick) thought we was a real bot.");
+                /* lame, i know. */
+                if (message.has_prefix("%squit".printf(BOT_PREFIX))) {
+                    irc.quit("OK OK, I\'m going..");
+                } else {
+                    irc.send_message(target, @"LOL $(user.nick) thought we was a real bot.");
+                }
             }
         }
     }

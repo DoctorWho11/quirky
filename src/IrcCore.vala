@@ -377,4 +377,18 @@ public class IrcCore
     {
         write_socket("PRIVMSG %s :%s\r\n", target, message);
     }
+
+    /**
+     * Quit from the IRC network.
+     *
+     * @param quit_msg An optional quit message
+     */
+    public void quit(string? quit_msg)
+    {
+        if (quit_msg != null) {
+            write_socket("QUIT :%s\r\n", quit_msg);
+        } else {
+            write_socket("QUIT\r\n");
+        }
+    }
 }
