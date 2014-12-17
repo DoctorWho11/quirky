@@ -241,34 +241,63 @@ public class DummyBot
 
         switch (command) {
             case "PRIVMSG":
-                /* Split target from remaining message */
-                var i = remnant.index_of(":");
-                if (i < 0 || i == remnant.length) {
-                    warning("Malformed %s", command);
+                IrcUser user;
+                string message;
+                string[] params;
+                parse_simple(sender, remnant, out user, out params, out message);
+                if (params.length != 1) {
+                    warning("Invalid PRIVMSG: more than one target!");
                     break;
                 }
-                string target = remnant.substring(0, i);
-                target = target.replace(" ", ""); // work around potentially broken systems
-                // unused
-                string message = remnant.substring(i+1);
-
-                IrcUser user = user_from_hostmask(sender);
-                sender = user.nick;
-
-                /* We need to improve our own nick handling, but basically if NICK ==
-                 * target, private message. So swap target for sender
-                 */
-                if (target == ident.nick) {
-                    target = user.nick;
+                // DEMO: Send message back (PM or channel depending on target)
+                string target = params[0] == ident.nick ? user.nick : params[0];
+                write_socket("PRIVMSG %s :Hello, %s\r\n", target, user.nick);
+                break;
+            case "JOIN":
+                IrcUser user;
+                string channel;
+                parse_simple(sender, remnant, out user, null, out channel);
+                if (user.nick == ident.nick) {
+                    /* For now just spam folks. */
+                    write_socket("PRIVMSG %s :I come in peace.\r\n", channel);
+                } else {
+                    write_socket("PRIVMSG %s :Welcome, %s!\r\n", channel, user.nick);
                 }
-
-                // demo code, for now we'll just respond to the sender on that same target.
-                write_socket("PRIVMSG %s :Hello, %s\r\n", target, sender);
                 break;
             default:
                 break;
         }
         /* TODO: Support all RFC commands */
+    }
+
+    /**
+     * Simplest route to parse IRC command remnants that use ":" notation
+     *
+     * @param sender The sender of the message (hostmask)
+     * @param remnant incoming remnant
+     * @param user Where to store the IrcUser info
+     * @param params Where to store any parameters (if wanted.)
+     * @param rhs Where to store right-hand-side portion of ":" message
+     */
+    protected void parse_simple(string sender, string remnant, out IrcUser user, out string[]? params, out string rhs)
+    {
+        var i = remnant.index_of(":");
+        if (i < 0 || i == remnant.length) {
+            warning("Malformed parse_simple usage: %s", remnant);
+            user = {};
+            params = null;
+            rhs = "";
+            return;
+        }
+
+        /* For now, space separated. May expand in future to suit API */
+        string pms = remnant.substring(0, i);
+        pms = pms.strip(); // because we end up with wrong lengths..
+        params = pms.split(" ");
+
+        /* implementation dependent */
+        rhs = remnant.substring(i+1);
+        user = user_from_hostmask(sender);
     }
 
     /**
