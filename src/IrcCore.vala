@@ -61,8 +61,7 @@ public class IrcCore
     SocketClient? client;
     SocketConnection? conn;
     IrcIdentity ident;
-    IOChannel? iochannel;
-    DataOutputStream dos;
+    Cancellable cancel;
 
     public signal void joined_channel(IrcUser user, string channel);
     public signal void user_quit(IrcUser user, string quit_msg);
@@ -91,81 +90,59 @@ public class IrcCore
     {
         /* Todo: Validate */
         this.ident = ident;
+        cancel = new Cancellable();
     }
 
-    public void connect(string host, uint16 port)
+    public async void connect(string host, uint16 port)
     {
         try {
             var r = Resolver.get_default();
-            var addresses = r.lookup_by_name(host, null);
+            var addresses = yield r.lookup_by_name_async(host, cancel);
             var addr = addresses.nth_data(0);
 
             var sock_addr = new InetSocketAddress(addr, port);
             var client = new SocketClient();
 
-            var connection = client.connect(sock_addr, null);
+            var connection = yield client.connect_async(sock_addr, cancel);
             if (connection != null) {
                 this.conn = connection;
                 this.client = client;
             }
-            connection.socket.set_blocking(false);
-            iochannel = new IOChannel.unix_new(connection.socket.fd);
-            if (iochannel == null) {
-                error("Unable to construct IOChannel!");
-                return;
-            }
 
-            dos = new DataOutputStream(connection.output_stream);
+            var dis = new DataInputStream(connection.input_stream);
+
             /* Attempt identification immediately, get the ball rolling */
-            write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
-            write_socket("NICK %s\r\n", ident.nick);
+            yield write_socket(F("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos));
+            yield write_socket(F("NICK %s\r\n", ident.nick));
 
-            iochannel.add_watch(IOCondition.IN | IOCondition.HUP, handle_io_in);
+            /* Now we loop. */
+            string line = null;
+            while ((line = yield dis.read_line_async(Priority.DEFAULT, cancel)) != null) {
+                yield handle_line(line);
+            }
         } catch (Error e) {
             message(e.message);
+            if (!cancel.is_cancelled()) {
+                cancel.cancel();
+            }
+            disconnected(); /* Handle more better.. */
         }
     }
 
-    protected bool handle_io_in(IOChannel source, IOCondition condition)
-    {
-        if ((condition & IOCondition.HUP) == IOCondition.HUP) {
-            stdout.printf("Socket died\n");
-            disconnected();
-            return false;
-        }
-
-        /* Read input if we have any */
-        string input;
-        size_t len;
-        IOStatus stat;
-        try {
-            stat = source.read_line(out input, out len, null);
-            if (stat == IOStatus.ERROR || stat == IOStatus.EOF) {
-                stdout.printf("Got nothing from server, SIGHUP assumed\n");
-                disconnected();
-                return false;
-            }
-            /* Happens, if we're going to block. */
-            if (input != null) {
-                handle_line(input);
-            }
-        } catch (Error e) {
-            warning("I/O failure! %s", e.message);
-            return false;
-        }
-
-        return true;
-    }
-
-    protected void write_socket(string fmt, ...)
+    /* Utility, shorter method calls.. */
+    protected string F(string fmt, ...)
     {
         va_list va = va_list();
-        string res = fmt.vprintf(va);
+        return fmt.vprintf(va);
+    }
 
+    protected async void write_socket(string line)
+    {
         try {
-            dos.put_string(res);
+            yield conn.output_stream.write_async(line.data, Priority.DEFAULT, cancel);
+            yield conn.output_stream.flush_async(Priority.DEFAULT, cancel);
         } catch (Error e) {
-            warning("I/O out error: %s", e.message);
+            warning("I/O error: %s", e.message);
         }
     }
 
@@ -194,7 +171,7 @@ public class IrcCore
      *
      * @param input The input line from the server
      */
-    void handle_line(string input)
+    async void handle_line(string input)
     {
         var line = input;
         /* You'd surely hope so. */
@@ -214,14 +191,14 @@ public class IrcCore
 
         if (!sender.has_prefix(":")) {
             /* Special command */
-            handle_command(sender, sender, line, remnant, true);
+            yield handle_command(sender, sender, line, remnant, true);
         } else {
             string command = segments[1];
             if (is_number(command)) {
                 var number = int.parse(command);
-                handle_numeric(sender, number, line, remnant);
+                yield handle_numeric(sender, number, line, remnant);
             } else {
-                handle_command(sender, command, line, remnant);
+                yield handle_command(sender, command, line, remnant);
             }
         }
         stdout.printf("%s\n", line);
@@ -235,8 +212,9 @@ public class IrcCore
      * @param line The unprocessed line
      * @param remnant Remainder of processed line
      */
-    void handle_numeric(string sender, int numeric, string line, string? remnant)
+    async void handle_numeric(string sender, int numeric, string line, string? remnant)
     {
+        /* NOTE: Doesn't need to be async *yet* but will in future.. */
         /* TODO: Support all RFC numerics */
         switch (numeric) {
             case 001:
@@ -256,13 +234,13 @@ public class IrcCore
      * @param remnant Remainder of processed line
      * @param special Whether this is a special case, like PING or ERROR
      */
-    void handle_command(string sender, string command, string line, string? remnant, bool special = false)
+    async void handle_command(string sender, string command, string line, string? remnant, bool special = false)
     {
         if (special) {
             switch (command) {
                 case "PING":
                     var send = line.replace("PING", "PONG");
-                    write_socket("%s\r\n", send);
+                    yield write_socket(F("%s\r\n", send));
                     return;
                 default:
                     /* Error, etc, not yet supported */
@@ -408,9 +386,9 @@ public class IrcCore
      * @note No password support yet
      * @param channel The channel to join
      */
-    public void join_channel(string channel)
+    public async void join_channel(string channel)
     {
-        write_socket("JOIN %s\r\n", channel);
+        yield write_socket(F("JOIN %s\r\n", channel));
     }
 
     /**
@@ -419,9 +397,9 @@ public class IrcCore
      * @param target An online IRC nick, or a joined IRC channel
      * @param message The message to send
      */
-    public void send_message(string target, string message)
+    public async void send_message(string target, string message)
     {
-        write_socket("PRIVMSG %s :%s\r\n", target, message);
+        yield write_socket(F("PRIVMSG %s :%s\r\n", target, message));
     }
 
     /**
@@ -429,12 +407,15 @@ public class IrcCore
      *
      * @param quit_msg An optional quit message
      */
-    public void quit(string? quit_msg)
+    public async void quit(string? quit_msg)
     {
         if (quit_msg != null) {
-            write_socket("QUIT :%s\r\n", quit_msg);
+            yield write_socket(F("QUIT :%s\r\n", quit_msg));
         } else {
-            write_socket("QUIT\r\n");
+            yield write_socket(F("QUIT\r\n"));
+        }
+        if (!cancel.is_cancelled()) {
+            cancel.cancel();
         }
     }
 }
