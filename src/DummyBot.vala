@@ -38,7 +38,8 @@ public class DummyBot
 
         /* Autojoin */
         irc.established.connect(()=> {
-            irc.join_channel.begin(default_channel);
+            irc.join_channel(default_channel);
+            irc.send_names("#evolveos");
         });
 
         irc.messaged.connect(on_messaged);
@@ -51,9 +52,9 @@ public class DummyBot
         irc.joined_channel.connect((u,c)=>{
             if (u.nick == ident.nick) {
                 /* For now just spam folks. */
-                irc.send_message.begin(c, "Let\'s not stand on ceremony here, Mr. Wayne..");
+                irc.send_message(c, "Let\'s not stand on ceremony here, Mr. Wayne..");
             } else {
-                irc.send_message.begin(c, @"Welcome, $(u.nick)!");
+                irc.send_message(c, @"Welcome, $(u.nick)!");
             }
         });
 
@@ -61,13 +62,19 @@ public class DummyBot
             /* i.e. we didn't leave.. */
             if (u.nick != ident.nick) {
                 if (r == null) {
-                    irc.send_message.begin(c, @"Sorry to see $(u.nick) go for no reason..");
+                    irc.send_message(c, @"Sorry to see $(u.nick) go for no reason..");
                 } else {
-                    irc.send_message.begin(c, @"Sorry to see $(u.nick) go .. ($(r))");
+                    irc.send_message(c, @"Sorry to see $(u.nick) go .. ($(r))");
                 }
             }
         });
 
+        irc.names_list.connect((c,l)=> {
+            message("%s has %u users", c, l.length());
+            foreach (var u in l) {
+                message("User on %s: %s", c, u);
+            }
+        });
         this.loop = loop;
     }
 
@@ -75,33 +82,33 @@ public class DummyBot
     {
         // DEMO: Send message back (PM or channel depending on target)
         if (target == ident.nick) {
-            irc.send_message.begin(user.nick, @"Hello, and thanks for the PM $(user.nick)");
+            irc.send_message(user.nick, @"Hello, and thanks for the PM $(user.nick)");
         } else {
             /* Only if we got mentioned.. */
             if (ident.nick in message) {
-                irc.send_message.begin(target, @"Wha? Who dere? Whatcha want $(user.nick)??");
+                irc.send_message(target, @"Wha? Who dere? Whatcha want $(user.nick)??");
             } else if (message.has_prefix(BOT_PREFIX)) {
                 if (message.length <= 1) {
-                    irc.send_message.begin(target, "Eh, need a proper command broski..");
+                    irc.send_message(target, "Eh, need a proper command broski..");
                     return;
                 }
                 string command = message.split(" ")[0].substring(1);
 
                 switch (command) {
                     case "quit":
-                        irc.quit.begin("OK OK, I\'m going");
+                        irc.quit("OK OK, I\'m going");
                         break;
                     case "ping":
-                        irc.send_message.begin(target, @"$(user.nick): PONG!");
+                        irc.send_message(target, @"$(user.nick): PONG!");
                         break;
                     case "forums":
-                        irc.send_message.begin(target, "Evolve OS Forums: https://evolve-os.com/forums/");
+                        irc.send_message(target, "Evolve OS Forums: https://evolve-os.com/forums/");
                         break;
                     case "wiki":
-                        irc.send_message.begin(target, "Evolve OS Wiki: https://evolve-os.com/wiki");
+                        irc.send_message(target, "Evolve OS Wiki: https://evolve-os.com/wiki");
                         break;
                     default:
-                        irc.send_message.begin(target, @"LOL $(user.nick) thought we was a real bot.");
+                        irc.send_message(target, @"LOL $(user.nick) thought we was a real bot.");
                         break;
                 }
             }
