@@ -217,7 +217,7 @@ public class IrcCore
         /* NOTE: Doesn't need to be async *yet* but will in future.. */
         /* TODO: Support all RFC numerics */
         switch (numeric) {
-            case 001:
+            case IRC.RPL_WELCOME:
                 established();
                 break;
             default:

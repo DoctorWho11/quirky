@@ -5,6 +5,7 @@ bin_PROGRAMS = \
 	dummy-client
 
 dummy_bot_SOURCES = \
+	IrcConstants.vala \
 	IrcCore.vala \
 	DummyBot.vala
 
@@ -22,6 +23,7 @@ dummy_bot_VALAFLAGS = \
 
 
 dummy_client_SOURCES = \
+	IrcConstants.vala \
 	IrcCore.vala \
 	DummyClient.vala
 
