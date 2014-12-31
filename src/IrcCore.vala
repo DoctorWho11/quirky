@@ -56,6 +56,8 @@ public struct IrcUser {
     string hostname;
 }
 
+private struct _olock { int x; }
+
 public class IrcCore
 {
     SocketClient? client;
@@ -66,10 +68,21 @@ public class IrcCore
     /* State tracking. */
     private string _motd;
 
+    private HashTable<string,Channel> channels;
+    /* Enable query for /NAMES, i.e. channels we're not in yet. */
+    private HashTable<string,Channel> channel_cache;
+
     public signal void joined_channel(IrcUser user, string channel);
     public signal void user_quit(IrcUser user, string quit_msg);
     public signal void messaged(IrcUser user, string target, string message);
     public signal void parted_channel(IrcUser user, string channel, string? reason);
+
+    /* All this is to ensure we perform valid non-blocking queued output. Phew. */
+    private Queue<string> out_q;
+    private uint out_s;
+    private _olock outm;
+    private IOChannel ioc;
+    private DataOutputStream dos;
 
     /**
      * Emitted when we start recieving the MOTD
@@ -86,6 +99,8 @@ public class IrcCore
      */
     public signal void motd(string motd);
 
+    /* Emitted when we get the names list (complete) */
+    public signal void names_list(string channel, List<string> users);
     public signal void disconnected();
 
     /**
@@ -109,6 +124,14 @@ public class IrcCore
         /* Todo: Validate */
         this.ident = ident;
         cancel = new Cancellable();
+
+        channels = new HashTable<string,Channel>(str_hash, str_equal);
+        channel_cache = new HashTable<string,Channel>(str_hash, str_equal);
+
+        out_q = new Queue<string>();
+        out_s = 0;
+        outm = {};
+        outm.x = 0;
     }
 
     public async void connect(string host, uint16 port)
@@ -127,11 +150,14 @@ public class IrcCore
                 this.client = client;
             }
 
+            connection.socket.set_blocking(false);
             var dis = new DataInputStream(connection.input_stream);
+            dos = new DataOutputStream(connection.output_stream);
+            ioc = new IOChannel.unix_new(connection.socket.fd);
 
             /* Attempt identification immediately, get the ball rolling */
-            yield write_socket(F("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos));
-            yield write_socket(F("NICK %s\r\n", ident.nick));
+            write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
+            write_socket("NICK %s\r\n", ident.nick);
 
             /* Now we loop. */
             string line = null;
@@ -147,20 +173,64 @@ public class IrcCore
         }
     }
 
-    /* Utility, shorter method calls.. */
-    protected string F(string fmt, ...)
+    protected bool dispatcher(IOChannel source, IOCondition cond)
     {
-        va_list va = va_list();
-        return fmt.vprintf(va);
+        if (cond == IOCondition.HUP) {
+            out_s = 0;
+            lock (outm) {
+                out_s = 0;
+            }
+            disconnected();
+            return false;
+        }
+        /* Kill this dispatch.. */
+        if (out_q.get_length() < 1) {
+            lock (outm) {
+                out_s = 0;
+            }
+            return false;
+        }
+        while (true)
+        {
+            unowned string? next;
+            if (out_q.get_length() < 1) {
+                break;
+            }
+            lock (outm) {
+                next = out_q.peek_head();
+            }
+            bool remove = false;
+            try {
+                remove = dos.put_string(next);
+            } catch (Error e) {
+                warning("Encountered I/O Error!");
+                break;
+            }
+            if (remove) {
+                lock (outm) {
+                    out_q.remove(next);
+                }
+            }
+        }
+        /* killing ourselves again */
+        lock (outm) {
+            out_s = 0;
+        }
+        return false;
     }
 
-    protected async void write_socket(string line)
+    protected void write_socket(string fmt, ...)
     {
-        try {
-            yield conn.output_stream.write_async(line.data, Priority.DEFAULT, cancel);
-            yield conn.output_stream.flush_async(Priority.DEFAULT, cancel);
-        } catch (Error e) {
-            warning("I/O error: %s", e.message);
+        va_list va = va_list();
+        string line = fmt.vprintf(va);
+
+        lock (outm) {
+            out_q.push_tail(line);
+
+            /* No current dispatch callback, set it up */
+            if (out_s == 0) {
+                out_s = ioc.add_watch(IOCondition.OUT | IOCondition.HUP, dispatcher);
+            }
         }
     }
 
@@ -195,6 +265,10 @@ public class IrcCore
         /* You'd surely hope so. */
         if (line.has_suffix("\r\n")) {
             line = line.substring(0, line.length-2);
+        }
+        /* Does sometimes happen on broken inspircd.. (RPL_NAMREPLY gives double \r) */
+        if (line.has_suffix("\r")) {
+            line = line.substring(0, line.length-1);
         }
         string[] segments = line.split(" ");
         if (segments.length < 2) {
@@ -239,6 +313,48 @@ public class IrcCore
                 established();
                 break;
 
+            /* Names handling.. */
+            case IRC.RPL_NAMREPLY:
+                string[] params; /* nick, mode, channel */
+                string msg;
+                unowned Channel? cc;
+
+                parse_simple(sender, remnant, null, out params, out msg);
+                if (params.length != 3) {
+                    warning("Invalid NAMREPLY parameter length!");
+                    break;
+                }
+
+                if (!channel_cache.contains(params[2])) {
+                    channel_cache[params[2]] = new Channel(params[2], params[1]);
+                }
+                cc = channel_cache[params[2]];
+                /* New names reply, reset cached version.. */
+                if (cc.final) {
+                    cc.reset_users();
+                }
+                foreach (var user in msg.strip().split(" ")) {
+                   cc.add_user(user);
+                }
+                break;
+            case IRC.RPL_ENDOFNAMES:
+                string[] params;
+                string msg; /* End of /NAMES, not really interesting. */
+                unowned Channel? cc;
+                parse_simple(sender, remnant, null, out params, out msg);
+                if (!channel_cache.contains(params[1])) {
+                    warning("Got RPL_ENDOFNAMES without cached list!");
+                    break;
+                }
+                cc = channel_cache[params[1]];
+                /* Update list in main channel store if it exists */
+                if (channels.contains(params[1])) {
+                    channels[params[1]].users = cc.users.copy();
+                }
+                names_list(params[1], cc.users);
+                channel_cache.remove(params[1]);
+                break;
+
             /* Motd handling */
             case IRC.RPL_MOTDSTART:
                 _motd = ""; /* Reset motd */
@@ -276,7 +392,7 @@ public class IrcCore
             switch (command) {
                 case "PING":
                     var send = line.replace("PING", "PONG");
-                    yield write_socket(F("%s\r\n", send));
+                    write_socket("%s\r\n", send);
                     return;
                 default:
                     /* Error, etc, not yet supported */
@@ -422,9 +538,9 @@ public class IrcCore
      * @note No password support yet
      * @param channel The channel to join
      */
-    public async void join_channel(string channel)
+    public void join_channel(string channel)
     {
-        yield write_socket(F("JOIN %s\r\n", channel));
+        write_socket("JOIN %s\r\n", channel);
     }
 
     /**
@@ -433,9 +549,9 @@ public class IrcCore
      * @param target An online IRC nick, or a joined IRC channel
      * @param message The message to send
      */
-    public async void send_message(string target, string message)
+    public void send_message(string target, string message)
     {
-        yield write_socket(F("PRIVMSG %s :%s\r\n", target, message));
+        write_socket("PRIVMSG %s :%s\r\n", target, message);
     }
 
     /**
@@ -443,15 +559,81 @@ public class IrcCore
      *
      * @param quit_msg An optional quit message
      */
-    public async void quit(string? quit_msg)
+    public void quit(string? quit_msg)
     {
         if (quit_msg != null) {
-            yield write_socket(F("QUIT :%s\r\n", quit_msg));
+            write_socket("QUIT :%s\r\n", quit_msg);
         } else {
-            yield write_socket(F("QUIT\r\n"));
+            write_socket("QUIT\r\n");
         }
         if (!cancel.is_cancelled()) {
             cancel.cancel();
         }
+    }
+
+    public void send_names(string? channel)
+    {
+        if (channel != null) {
+            write_socket("NAMES %s\r\n", channel);
+        } else {
+            write_socket("NAMES\r\n");
+        }
+    }
+}
+
+/**
+ * Used to represent an IRC channel
+ */
+public class Channel {
+
+    /* Known user list for this channel */
+    /* NOTE: Linked lists are evil slow, replace in future.. */
+    public List<string> users;
+    public string name { public get; private set; }
+    public string mode { public get; private set; }
+
+    public bool final { public get; public set; }
+
+    public Channel(string name, string mode)
+    {
+        users = new List<string>();
+        this.name = name;
+        this.mode = mode;
+        final = false;
+    }
+
+    public void add_user(string user)
+    {
+        if (users.find_custom(user, strcmp) == null) {
+            users.append(user);
+        }
+    }
+
+    public bool has_user(string user)
+    {
+        unowned List<string>? elem = users.find_custom(user, strcmp);
+        return (elem != null);
+    }
+
+    public void rename_user(string old, string newname)
+    {
+        unowned List<string>? elem = users.find_custom(old, strcmp);
+        if (elem != null) {
+            elem.data = newname;
+        }
+    }
+
+    public void remove_user(string user)
+    {
+        unowned List<string>? elem = users.find_custom(user, strcmp);
+        if (elem != null) {
+            users.remove_link(elem);
+        }
+    }
+
+    public void reset_users()
+    {
+        users = new List<string>();
+        final = false;
     }
 }
