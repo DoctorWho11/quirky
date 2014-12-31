@@ -16,6 +16,7 @@ public class DummyBot
     IrcCore irc;
 
     static string BOT_PREFIX = "~";
+    private MainLoop loop;
 
     public DummyBot(MainLoop loop)
     {
@@ -32,11 +33,12 @@ public class DummyBot
         irc.disconnected.connect(()=> {
             stdout.printf("Disconnected\n");
             loop.quit();
+            Process.exit(1);
         });
 
         /* Autojoin */
         irc.established.connect(()=> {
-            irc.join_channel(default_channel);
+            irc.join_channel.begin(default_channel);
         });
 
         irc.messaged.connect(on_messaged);
@@ -49,9 +51,9 @@ public class DummyBot
         irc.joined_channel.connect((u,c)=>{
             if (u.nick == ident.nick) {
                 /* For now just spam folks. */
-                irc.send_message(c, "Let\'s not stand on ceremony here, Mr. Wayne..");
+                irc.send_message.begin(c, "Let\'s not stand on ceremony here, Mr. Wayne..");
             } else {
-                irc.send_message(c, @"Welcome, $(u.nick)!");
+                irc.send_message.begin(c, @"Welcome, $(u.nick)!");
             }
         });
 
@@ -59,46 +61,47 @@ public class DummyBot
             /* i.e. we didn't leave.. */
             if (u.nick != ident.nick) {
                 if (r == null) {
-                    irc.send_message(c, @"Sorry to see $(u.nick) go for no reason..");
+                    irc.send_message.begin(c, @"Sorry to see $(u.nick) go for no reason..");
                 } else {
-                    irc.send_message(c, @"Sorry to see $(u.nick) go .. ($(r))");
+                    irc.send_message.begin(c, @"Sorry to see $(u.nick) go .. ($(r))");
                 }
             }
         });
-            
+
+        this.loop = loop;
     }
 
     public void on_messaged(IrcUser user, string target, string message)
     {
         // DEMO: Send message back (PM or channel depending on target)
         if (target == ident.nick) {
-            irc.send_message(user.nick, @"Hello, and thanks for the PM $(user.nick)");
+            irc.send_message.begin(user.nick, @"Hello, and thanks for the PM $(user.nick)");
         } else {
             /* Only if we got mentioned.. */
             if (ident.nick in message) {
-                irc.send_message(target, @"Wha? Who dere? Whatcha want $(user.nick)??");
+                irc.send_message.begin(target, @"Wha? Who dere? Whatcha want $(user.nick)??");
             } else if (message.has_prefix(BOT_PREFIX)) {
                 if (message.length <= 1) {
-                    irc.send_message(target, "Eh, need a proper command broski..");
+                    irc.send_message.begin(target, "Eh, need a proper command broski..");
                     return;
                 }
                 string command = message.split(" ")[0].substring(1);
 
                 switch (command) {
                     case "quit":
-                        irc.quit("OK OK, I\'m going");
+                        irc.quit.begin("OK OK, I\'m going");
                         break;
                     case "ping":
-                        irc.send_message(target, @"$(user.nick): PONG!");
+                        irc.send_message.begin(target, @"$(user.nick): PONG!");
                         break;
                     case "forums":
-                        irc.send_message(target, "Evolve OS Forums: https://evolve-os.com/forums/");
+                        irc.send_message.begin(target, "Evolve OS Forums: https://evolve-os.com/forums/");
                         break;
                     case "wiki":
-                        irc.send_message(target, "Evolve OS Wiki: https://evolve-os.com/wiki");
+                        irc.send_message.begin(target, "Evolve OS Wiki: https://evolve-os.com/wiki");
                         break;
                     default:
-                        irc.send_message(target, @"LOL $(user.nick) thought we was a real bot.");
+                        irc.send_message.begin(target, @"LOL $(user.nick) thought we was a real bot.");
                         break;
                 }
             }
@@ -108,7 +111,10 @@ public class DummyBot
     
     public void run_bot()
     {
-        irc.connect("localhost", 6667);
+        irc.connect.begin("localhost", 6667, ()=> {
+            stdout.printf("Loop quit\n");
+            loop.quit();
+        });
     }
 }
 

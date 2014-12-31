@@ -64,10 +64,10 @@ public class DummyClient : Gtk.Window
         };
 
         core = new IrcCore(ident);
-        core.connect("localhost", 6667);
+        core.connect.begin("localhost", 6667);
         core.messaged.connect(on_messaged);
         core.established.connect(()=> {
-            core.join_channel(channel);
+            core.join_channel.begin(channel);
         });
 
         set_size_request(600, 400);
@@ -80,7 +80,7 @@ public class DummyClient : Gtk.Window
             string message = input.text;
             string target = "#evolveos";
 
-            core.send_message(target, message);
+            core.send_message.begin(target, message);
 
             string append = @"$(ident.nick) => $(target) : $(message)\n";
             var txt = main_view.buffer.text + append;
