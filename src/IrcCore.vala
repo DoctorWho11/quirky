@@ -63,10 +63,28 @@ public class IrcCore
     IrcIdentity ident;
     Cancellable cancel;
 
+    /* State tracking. */
+    private string _motd;
+
     public signal void joined_channel(IrcUser user, string channel);
     public signal void user_quit(IrcUser user, string quit_msg);
     public signal void messaged(IrcUser user, string target, string message);
     public signal void parted_channel(IrcUser user, string channel, string? reason);
+
+    /**
+     * Emitted when we start recieving the MOTD
+     */
+    public signal void motd_start();
+
+    /**
+     * Emitted for each line of the MOTD
+     */
+    public signal void motd_line(string line);
+
+    /**
+     * Emitted when we get RPL_ENDOFMOTD, with the complete MOTD
+     */
+    public signal void motd(string motd);
 
     public signal void disconnected();
 
@@ -219,6 +237,24 @@ public class IrcCore
         switch (numeric) {
             case IRC.RPL_WELCOME:
                 established();
+                break;
+
+            /* Motd handling */
+            case IRC.RPL_MOTDSTART:
+                _motd = ""; /* Reset motd */
+                motd_start();
+                break;
+            case IRC.RPL_MOTD:
+                string msg;
+                parse_simple(sender, remnant, null, null, out msg);
+                motd_line(msg);
+                _motd += "\n" + msg;
+                break;
+            case IRC.RPL_ENDOFMOTD:
+                if (!_motd.has_suffix("\n")) {
+                    _motd += "\n";
+                }
+                motd(_motd);
                 break;
             default:
                 break;

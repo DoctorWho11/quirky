@@ -70,6 +70,10 @@ public class DummyClient : Gtk.Window
             core.join_channel.begin(channel);
         });
 
+        core.motd.connect((m)=> {
+            main_view.buffer.text += m;
+        });
+
         set_size_request(600, 400);
         show_all();
     }

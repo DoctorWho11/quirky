@@ -10,5 +10,9 @@
  */
 
 public enum IRC {
-    RPL_WELCOME = 001 /* Successful connection to IRC/registered */
+    RPL_WELCOME = 001, /* Successful connection to IRC/registered */
+
+    RPL_MOTDSTART = 375, /* Message-of-the-day (start) */
+    RPL_MOTD = 372, /* Message-of-the-day (content) */
+    RPL_ENDOFMOTD = 376 /* Message-of-the-day (end) */
 }
