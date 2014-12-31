@@ -176,7 +176,6 @@ public class IrcCore
     protected bool dispatcher(IOChannel source, IOCondition cond)
     {
         if (cond == IOCondition.HUP) {
-            out_s = 0;
             lock (outm) {
                 out_s = 0;
             }
