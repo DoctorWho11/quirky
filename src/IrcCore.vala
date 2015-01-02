@@ -65,6 +65,9 @@ public class IrcCore
     IrcIdentity ident;
     Cancellable cancel;
 
+    public static int64 sid = 0;
+    public int64 id;
+
     /* State tracking. */
     private string _motd;
 
@@ -132,9 +135,11 @@ public class IrcCore
         out_s = 0;
         outm = {};
         outm.x = 0;
+        this.id = IrcCore.sid;
+        IrcCore.sid++;
     }
 
-    public async void connect(string host, uint16 port)
+    public async void connect(string host, uint16 port, bool use_ssl)
     {
         try {
             var r = Resolver.get_default();
@@ -144,12 +149,17 @@ public class IrcCore
             var sock_addr = new InetSocketAddress(addr, port);
             var client = new SocketClient();
 
+            /* Attempt ssl :o */
+            if (use_ssl) {
+                client.set_tls(true);
+                client.event.connect(on_client_event);
+            }
+
             var connection = yield client.connect_async(sock_addr, cancel);
             if (connection != null) {
                 this.conn = connection;
                 this.client = client;
             }
-
             connection.socket.set_blocking(false);
             var dis = new DataInputStream(connection.input_stream);
             dos = new DataOutputStream(connection.output_stream);
@@ -170,6 +180,20 @@ public class IrcCore
                 cancel.cancel();
             }
             disconnected(); /* Handle more better.. */
+        }
+    }
+
+    private void on_client_event(SocketClientEvent e, SocketConnectable? s, IOStream? con)
+    {
+        if (e == SocketClientEvent.TLS_HANDSHAKING) {
+            message("Handshaking..");
+            var t = con as TlsClientConnection;
+            t.set_use_ssl3(false);
+            t.accept_certificate.connect((c,e)=> {
+                return true;
+            });
+        } else if (e == SocketClientEvent.TLS_HANDSHAKED) {
+            message("Handshake complete");
         }
     }
 
@@ -271,7 +295,7 @@ public class IrcCore
         }
         string[] segments = line.split(" ");
         if (segments.length < 2) {
-            warning("IRC server appears to be on crack.");
+            warning("IRC server appears to be on crack. %s", line);
             return;
         }
         /* Sender is a special case, can sometimes be a command.. */
