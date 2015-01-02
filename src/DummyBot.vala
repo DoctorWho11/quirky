@@ -118,7 +118,7 @@ public class DummyBot
     
     public void run_bot()
     {
-        irc.connect.begin("localhost", 6667, ()=> {
+        irc.connect.begin("localhost", 6667, false, ()=> {
             stdout.printf("Loop quit\n");
             loop.quit();
         });
