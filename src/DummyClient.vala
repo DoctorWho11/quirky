@@ -12,10 +12,93 @@ public class DummyClient : Gtk.Window
 {
     Gtk.HeaderBar header;
     Gtk.Entry input;
-    Gtk.TextView main_view;
+    IrcTextWidget? main_view;
     Gtk.ScrolledWindow scroll;
     IrcIdentity ident;
-    IrcCore core;
+    IrcCore? core = null;
+    IrcSidebar sidebar;
+    string? target;
+
+    HashTable<string,Gtk.TextBuffer> buffers;
+
+    HashTable<IrcCore?,SidebarExpandable> roots;
+
+    bool set_view = false;
+
+    private void connect_server(string host, uint16 port, bool ssl)
+    {
+        var header = sidebar.add_expandable(host, "network-server-symbolic");
+        header.activated.connect(()=> {
+            IrcCore core = header.get_data("icore");
+            this.core = core;
+            var buf = get_named_buffer(core, "\\ROOT\\");
+            main_view.set_buffer(buf);
+            main_view.update_tabs(buf, ident.nick);
+        });
+        /* Need moar status in window.. */
+        message("Connecting to %s:%d", host, port);
+
+        var core = new IrcCore(ident);
+        roots[core] = header;
+        header.set_data("icore", core);
+        core.connect.begin(host, port, false);
+        core.messaged.connect(on_messaged);
+        core.established.connect(()=> {
+            core.join_channel("#evolveos");
+        });
+        core.joined_channel.connect((u,c)=> {
+            if (u.nick == ident.nick) {
+                var root = roots[core];
+                var item = root.add_item(c, "user-available-symbolic");
+                item.set_data("icore", core);
+                item.set_data("ichannel", c);
+                item.activated.connect(()=> {
+                    var buf = get_named_buffer(core, c);
+                    this.core = item.get_data("icore");
+                    this.target = item.get_data("ichannel");
+                    main_view.set_buffer(buf);
+                    main_view.update_tabs(buf, ident.nick);
+                });
+                var buf = get_named_buffer(core, c); /* do nothing :P */
+                main_view.add_message(buf, "", @"You have joined $(c)", IrcTextType.JOIN);
+            } else {
+                var buf = get_named_buffer(core, c); /* do nothing :P */
+                main_view.add_message(buf, u.nick, @"has joined $(c)", IrcTextType.JOIN);
+            }
+        });
+        core.parted_channel.connect((u,c,r)=> {
+            string msg = @"has left $(c)";
+            if (r != null) {
+                msg += @" ($(r))";
+            }
+            var buf = get_named_buffer(core, c);
+            main_view.add_message(buf, u.nick == ident.nick ? "" : u.nick, msg, IrcTextType.PART);
+        }); 
+        core.motd.connect((m)=> {
+            var buf = get_named_buffer(core, "\\ROOT\\");
+            main_view.add_message(buf, "", m, IrcTextType.MOTD);
+        });
+    }
+
+    private unowned Gtk.TextBuffer get_named_buffer(IrcCore c, string name)
+    {
+        string compname = @"$(c.id)$(name)";
+        Gtk.TextBuffer? buf;
+        if (compname in buffers) {
+            buf = buffers[compname];
+        } else {
+            buf = new Gtk.TextBuffer(main_view.tags);
+            buffers[compname] = buf;
+        }
+
+        if (!set_view) {
+            main_view.set_buffer(buf);
+            main_view.update_tabs(buf, ident.nick);
+            set_view = true;
+        }
+
+        return buffers[compname];
+    }
 
     public DummyClient()
     {
@@ -29,33 +112,36 @@ public class DummyClient : Gtk.Window
 
         destroy.connect(Gtk.main_quit);
 
+        var main_layout = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
+        add(main_layout);
+
+        /* Sidebar.. */
+        scroll = new Gtk.ScrolledWindow(null, null);
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
+        sidebar = new IrcSidebar();
+        scroll.add(sidebar);
+        main_layout.pack_start(scroll, false, false, 0);
+
+        buffers = new HashTable<string,Gtk.TextBuffer>(str_hash, str_equal);
+        roots = new HashTable<IrcCore?,SidebarExpandable>(direct_hash, direct_equal);
+
         var layout = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
-        add(layout);
+        main_layout.pack_start(layout, true, true, 0);
 
         scroll = new Gtk.ScrolledWindow(null, null);
         scroll.border_width = 2;
         scroll.set_shadow_type(Gtk.ShadowType.IN);
-        main_view = new Gtk.TextView();
+        main_view = new IrcTextWidget();
         main_view.set_editable(false);
         scroll.add(main_view);
         layout.pack_start(scroll, true, true, 0);
 
-        var bottom = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
-        bottom.border_width = 2;
-        bottom.get_style_context().add_class("linked");
-        layout.pack_end(bottom, false, false, 0);
-
         input = new Gtk.Entry();
         input.set_placeholder_text("Write a message");
         input.activate.connect(send_text);
-        bottom.pack_start(input, true, true, 0);
-
-        var send = new Gtk.Button.with_label("Send");
-        send.clicked.connect(send_text);
-        bottom.pack_end(send, false, false, 0);
+        layout.pack_end(input, false, false, 0);
 
         /* Totes evil. Make configurable */
-        string channel = "#evolveos";
         ident = IrcIdentity() {
             nick = "ikeytestclient",
             username = "ikeytest",
@@ -63,18 +149,10 @@ public class DummyClient : Gtk.Window
             mode = 0
         };
 
-        core = new IrcCore(ident);
-        core.connect.begin("localhost", 6667);
-        core.messaged.connect(on_messaged);
-        core.established.connect(()=> {
-            core.join_channel(channel);
-        });
+        /* Need to fix this! Make it an option, and soon! */
+        connect_server("localhost", 6667, false);
 
-        core.motd.connect((m)=> {
-            main_view.buffer.text += m;
-        });
-
-        set_size_request(600, 400);
+        set_size_request(800, 550);
         show_all();
     }
 
@@ -82,22 +160,23 @@ public class DummyClient : Gtk.Window
     {
         if (input.text.length > 0) {
             string message = input.text;
-            string target = "#evolveos";
-
+            if (core == null) {
+                error("MISSING IRCCORE!");
+                return;
+            }
             core.send_message(target, message);
 
-            string append = @"$(ident.nick) => $(target) : $(message)\n";
-            var txt = main_view.buffer.text + append;
-            main_view.buffer.set_text(txt);
+            var buffer = get_named_buffer(core, target);
+            main_view.add_message(buffer, ident.nick, message, IrcTextType.MESSAGE);
             input.set_text("");
+            main_view.update_tabs(buffer, ident.nick);
         }
     }
-    protected void on_messaged(IrcUser user, string target, string message)
+    protected void on_messaged(IrcCore core, IrcUser user, string target, string message)
     {
         /* Right now we don't check PMs, etc. */
-        string append = @"$(user.nick) => $(target) : $(message)\n";
-        var txt = main_view.buffer.text + append;
-        main_view.buffer.set_text(txt);
+        var buffer = get_named_buffer(core, target);
+        main_view.add_message(buffer, user.nick, message, IrcTextType.MESSAGE);
     }
 }
 

@@ -25,6 +25,8 @@ dummy_bot_VALAFLAGS = \
 dummy_client_SOURCES = \
 	IrcConstants.vala \
 	IrcCore.vala \
+	IrcTextWidget.vala \
+	Widgets.vala \
 	DummyClient.vala
 
 dummy_client_CFLAGS = \
