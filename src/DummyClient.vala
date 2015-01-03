@@ -196,6 +196,7 @@ public class DummyClient : Gtk.ApplicationWindow
         scroll.set_shadow_type(Gtk.ShadowType.IN);
         main_view = new IrcTextWidget();
         main_view.set_editable(false);
+        main_view.use_timestamp = true;
         scroll.add(main_view);
         layout.pack_start(scroll, true, true, 0);
 

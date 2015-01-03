@@ -42,6 +42,17 @@ public class IrcTextWidget : Gtk.TextView
 
     public Gtk.TextTagTable tags { public get; private set; }
 
+    public bool use_timestamp {
+        public set {
+            tags.lookup("timestamp").invisible = !value;
+            update_tabs(get_buffer(), null);
+        }
+        public get {
+            return !(tags.lookup("timestamp").invisible);
+        }
+    }
+    private int timestamp_length = 0;
+
     private int max(int a, int b)
     {
         if (a > b) {
@@ -184,6 +195,15 @@ public class IrcTextWidget : Gtk.TextView
                 buf.get_end_iter(out i);
             }
         }
+
+        var time = new DateTime.now_local();
+        var stamp = time.format("[%H:%M:%S]  ");
+        if (stamp.length > timestamp_length) {
+            timestamp_length = stamp.length;
+        }
+
+        buffer.insert_with_tags_by_name(i, stamp, -1, "timestamp", "default");
+        buffer.get_end_iter(out i);
 
         /* Custom formatting for certain message types.. */
         if (ttype == IrcTextType.MESSAGE) {
@@ -358,7 +378,7 @@ public class IrcTextWidget : Gtk.TextView
     /**
      * Update tabstop to align nicks and text properly
      */
-    public void update_tabs(Gtk.TextBuffer? buffer, string nick)
+    public void update_tabs(Gtk.TextBuffer? buffer, string? nick)
     {
         if (buffer == null) {
             return;
@@ -372,7 +392,7 @@ public class IrcTextWidget : Gtk.TextView
         }
 
         int lwidth = buffer.get_data("_nlwidth");
-        if (nick == "") {
+        if (nick == "" || nick == null) {
             nick = buffer.get_data("_lastnick");
             if (nick == null) {
                 return;
@@ -386,6 +406,10 @@ public class IrcTextWidget : Gtk.TextView
 
         var twidth = nick.length + 5;
         buffer.set_data("_nlwidth", twidth);
+
+        if (use_timestamp) {
+            twidth += timestamp_length;
+        }
 
         var ctx = get_pango_context();
         Pango.FontDescription? desc = custom_font ? tags.lookup("default").font_desc : null;
