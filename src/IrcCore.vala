@@ -84,6 +84,7 @@ public class IrcCore
     public signal void joined_channel(IrcUser user, string channel);
     public signal void user_quit(IrcUser user, string quit_msg);
     public signal void messaged(IrcUser user, string target, string message, IrcMessageType type);
+    public signal void noticed(IrcUser user, string target, string message, IrcMessageType type);
     public signal void parted_channel(IrcUser user, string channel, string? reason);
 
     /* All this is to ensure we perform valid non-blocking queued output. Phew. */
@@ -128,6 +129,15 @@ public class IrcCore
     public signal void user_kicked(IrcUser user, string channel, string whom, string reason);
 
     /**
+     * Recieved a CTCP request
+     * @param user The originator of the request
+     * @param command The command name
+     * @param text Any remaining text (not always present)
+     * @param privmsg Whether this was a privmsg (i.e. not NOTICE)
+     */
+    public signal void ctcp(IrcUser user, string command, string text, bool privmsg);
+
+    /**
      * Indicates we've established our connection to the IRC network, and have
      * recieved our welcome response
      */
@@ -170,12 +180,15 @@ public class IrcCore
         }
         int index = msg.index_of_char(' ', 1);
         if (index < 0) {
+            index = msg.length-1;
+        }
+        if (index < 1) {
             return false;
         }
-
         cmd = msg.substring(1,index-1);
-
-        content = msg.substring(index+1, (msg.length-2)-index);
+        if (index+1 < msg.length) {
+            content = msg.substring(index+1, (msg.length-2)-index);
+        }
         return true;
     }
 
@@ -465,12 +478,13 @@ public class IrcCore
 
         switch (command) {
             case "PRIVMSG":
+            case "NOTICE":
                 IrcUser user;
                 string message;
                 string[] params;
                 parse_simple(sender, remnant, out user, out params, out message);
                 if (params.length != 1) {
-                    warning("Invalid PRIVMSG: more than one target!");
+                    warning(@"Invalid $(command): more than one target!");
                     break;
                 }
                 string ctcp_command;
@@ -482,13 +496,20 @@ public class IrcCore
                     type = IrcMessageType.CHANNEL;
                 }
                 if (parse_ctcp(message, out ctcp_command, out ctcp_string)) {
-                    /* TODO: Add more CTCP support, signal, etc :p */
                     if (ctcp_command == "ACTION") {
                         type |= IrcMessageType.ACTION;
                         message = ctcp_string;
+                    } else {
+                        /* Send off to ctcp handlers instead. */
+                        ctcp(user, ctcp_command, ctcp_string, command == "PRIVMSG");
+                        break;
                     }
                 }
-                messaged(user, params[0], message, type);
+                if (command == "PRIVMSG") {
+                    messaged(user, params[0], message, type);
+                } else {
+                    noticed(user, params[0], message, type);
+                }
                 break;
             case "JOIN":
                 IrcUser user;
@@ -633,6 +654,17 @@ public class IrcCore
     }
 
     /**
+     * Send a notice to the target
+     *
+     * @param target An online IRC nick, or a joined IRC channel
+     * @param message The message to send
+     */
+    public void send_notice(string target, string message)
+    {
+        write_socket("NOTICE %s :%s\r\n", target, message);
+    }
+
+    /**
      * Send a CTCP ACTION
      *
      * @note This is the /me command in IRC clients, i.e. /me is a loser
@@ -641,7 +673,24 @@ public class IrcCore
      */
     public void send_action(string target, string action)
     {
-        write_socket(@"PRIVMSG %s :$(CTCP_PREFIX)ACTION %s$(CTCP_PREFIX)\r\n", target, action);
+        send_ctcp(target, "ACTION", action);
+    }
+
+    /**
+     * Send a named CTCP command response
+     *
+     * @note PRIVMSG CTCP queries should be responded to with NOTICE, to avoid error loops!
+     * @param target Who to send the response to
+     * @param command The CTCP command (i.e. ACTION)
+     * @param content Optional content to add to the message
+     * @param notice Whether to use NOTICE or PRIVMSG
+     */
+    public void send_ctcp(string target, string command, string? content, bool notice = false)
+    {
+        string cmd = content != null ? @"$(command) $(content)" : "$(command)";
+        string msgtype = notice ? "NOTICE" : "PRIVMSG";
+
+        write_socket(@"%s %s :$(CTCP_PREFIX)%s$(CTCP_PREFIX)\r\n", msgtype, target, cmd);
     }
 
     /**

@@ -75,6 +75,26 @@ public class DummyBot
                 message("User on %s: %s", c, u);
             }
         });
+
+        /* Simple handling of ctcp */
+        irc.ctcp.connect((u,c,t,p)=> {
+            message("Got CTCP %s from %s: %s", c, u.nick, t);
+            switch (c) {
+                case "VERSION":
+                    irc.send_ctcp(u.nick, "VERSION", "DummyBot 0.1 / Probably Linux!",p);
+                    break;
+                case "PING":
+                    if (t == "") {
+                        warning("%s sent us a borked CTCP PING with no timestamp", u.nick);
+                    } else {
+                        irc.send_ctcp(u.nick, "PING", t, p);
+                    }
+                    break;
+                default:
+                    warning("Unknown CTCP request (%s %s) from %s: ", c, t, u.nick);
+                    break;
+                }                        
+        });
         this.loop = loop;
     }
 
