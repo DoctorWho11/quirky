@@ -626,12 +626,14 @@ public class IrcCore : Object
                 break;
             case "NICK":
                 IrcUser user = user_from_hostmask(sender);
+                var new_nick = remnant.strip().replace(":", "");
+                /* Le sigh for standards. Some send :, some don't */
                 /* Update our own nick */
                 if (user.nick == ident.nick) {
-                    ident.nick = remnant;
-                    nick_changed(user, remnant, true);
+                    ident.nick = new_nick;
+                    nick_changed(user, new_nick, true);
                 } else {
-                    nick_changed(user, remnant, false);
+                    nick_changed(user, new_nick, false);
                 }
                 break;
             case "QUIT":
