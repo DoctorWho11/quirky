@@ -157,18 +157,7 @@ public class DummyClient : Gtk.ApplicationWindow
         action.activate.connect(()=> {
             queue_draw();
             Idle.add(()=> {
-                var dlg = new ConnectDialog(this);
-                if (dlg.run() == Gtk.ResponseType.OK) {
-                    IrcIdentity ident = IrcIdentity() {
-                        nick = "ikeytestclient", /* Backup */
-                        username = "dummyclient",
-                        gecos = "Ikeys Test Client",
-                        mode = 0
-                    };
-                    ident.nick = dlg.nickname;
-                    connect_server(dlg.host, dlg.port, dlg.ssl, dlg.channel, ident);
-                }
-                dlg.destroy();
+                show_connect_dialog();
                 return false;
             });
         });
@@ -206,10 +195,32 @@ public class DummyClient : Gtk.ApplicationWindow
         input.activate.connect(send_text);
         layout.pack_end(input, false, false, 0);
 
-        /* Need to fix this! Make it an option, and soon! */
-        //connect_server("localhost", 6667, false);
-
         set_size_request(800, 550);
+
+        Idle.add(()=> {
+            show_connect_dialog();
+            return false;
+        });
+    }
+
+    /**
+     * Show a network connect dialog. In future we'll have identities and stored
+     * networks
+     */
+    private void show_connect_dialog()
+    {
+        var dlg = new ConnectDialog(this);
+        if (dlg.run() == Gtk.ResponseType.OK) {
+            IrcIdentity ident = IrcIdentity() {
+                nick = "ikeytestclient", /* Backup */
+                username = "dummyclient",
+                gecos = "Ikeys Test Client",
+                mode = 0
+            };
+            ident.nick = dlg.nickname;
+            connect_server(dlg.host, dlg.port, dlg.ssl, dlg.channel, ident);
+        }
+        dlg.destroy();
     }
 
     /**
