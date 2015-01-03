@@ -409,7 +409,7 @@ public class IrcTextWidget : Gtk.TextView
         buffer.set_data("_nlwidth", twidth);
 
         if (use_timestamp) {
-            twidth += timestamp_length;
+            twidth += timestamp_length + 1;
         }
 
         var ctx = get_pango_context();
