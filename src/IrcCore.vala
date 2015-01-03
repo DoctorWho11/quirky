@@ -323,6 +323,7 @@ public class IrcCore : Object
             bool remove = false;
             try {
                 remove = dos.put_string(next);
+                dos.flush();
             } catch (Error e) {
                 warning("Encountered I/O Error!");
                 break;
