@@ -264,7 +264,17 @@ public class DummyClient : Gtk.ApplicationWindow
 
         /* TODO: Add command parser!! */
         if (message.has_prefix("/me")) {
-            message = input.text.split("/me ")[1];
+            var splits = message.split("/me");
+            if (splits.length < 2) {
+                warning("OHAI our command handling sucks right now, but not as bad as your /me");
+                return;
+            }
+            message = input.text.split("/me")[1].chug();
+            if (message.length == 0) {
+                warning("OHAI our command handling sucks right now, but not as bad as your /me");
+                return;
+            }
+
             action = true;
         }
         if (message.length == 0) {
