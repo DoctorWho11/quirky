@@ -212,7 +212,11 @@ public class DummyClient : Gtk.ApplicationWindow
     {
         /* Right now we don't check PMs, etc. */
         var buffer = get_named_buffer(core, target);
-        main_view.add_message(buffer, user.nick, message, IrcTextType.MESSAGE);
+        if ((type & IrcMessageType.ACTION) != 0) {
+            main_view.add_message(buffer, user.nick, message, IrcTextType.ACTION);
+        } else {
+            main_view.add_message(buffer, user.nick, message, IrcTextType.MESSAGE);
+        }
     }
 }
 
