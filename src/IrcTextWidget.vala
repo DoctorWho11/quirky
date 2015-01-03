@@ -59,7 +59,7 @@ public class IrcTextWidget : Gtk.TextView
 
     public IrcTextWidget()
     {
-        set_wrap_mode(Gtk.WrapMode.WORD);
+        set_wrap_mode(Gtk.WrapMode.WORD_CHAR);
         set_cursor_visible(false);
         set_editable(false);
 
