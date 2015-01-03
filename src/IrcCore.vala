@@ -64,7 +64,7 @@ public enum IrcMessageType {
 
 private struct _olock { int x; }
 
-public class IrcCore
+public class IrcCore : Object
 {
     SocketClient? client;
     SocketConnection? conn;

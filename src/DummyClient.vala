@@ -30,7 +30,7 @@ public class DummyClient : Gtk.ApplicationWindow
         (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected);
     }
 
-    private void connect_server(string host, uint16 port, bool ssl)
+    private void connect_server(string host, uint16 port, bool ssl, string? autojoin)
     {
         var header = sidebar.add_expandable(host, "network-server-symbolic");
         header.activated.connect(()=> {
@@ -47,10 +47,14 @@ public class DummyClient : Gtk.ApplicationWindow
         var core = new IrcCore(ident);
         roots[core] = header;
         header.set_data("icore", core);
-        core.connect.begin(host, port, false);
+        core.set_data("autojoin", autojoin);
+        core.connect.begin(host, port, ssl);
         core.messaged.connect(on_messaged);
         core.established.connect(()=> {
-            core.join_channel("#evolveos");
+            string aj = core.get_data("autojoin");
+            if (aj != null) {
+                core.join_channel(aj);
+            }
             if (!set_view) {
                 this.core = core;
             }
@@ -125,6 +129,7 @@ public class DummyClient : Gtk.ApplicationWindow
 
         /* actions.. */
         var btn = new Gtk.MenuButton();
+        btn.margin_left = 6;
         var img = new Gtk.Image.from_icon_name("list-add-symbolic", Gtk.IconSize.BUTTON);
         btn.add(img);
         header.pack_start(btn);
@@ -134,14 +139,32 @@ public class DummyClient : Gtk.ApplicationWindow
         btn.set_menu_model(menu);
         btn.set_use_popover(true);
 
-        /* connect to server.. */
+        /* join channel. */
         var action = new SimpleAction("join_channel", null);
         action.activate.connect(()=> {
-            var dlg = new JoinChannelDialog(this);
-            if (dlg.run() == Gtk.ResponseType.OK) {
-                core.join_channel(dlg.response_text);
-            }
-            dlg.destroy();
+            queue_draw();
+            Idle.add(()=> {
+                var dlg = new JoinChannelDialog(this);
+                if (dlg.run() == Gtk.ResponseType.OK) {
+                    core.join_channel(dlg.response_text);
+                }
+                dlg.destroy();
+                return false;
+            });
+        });
+        application.add_action(action);
+        /* connect to server. */
+        action = new SimpleAction("connect", null);
+        action.activate.connect(()=> {
+            queue_draw();
+            Idle.add(()=> {
+                var dlg = new ConnectDialog(this);
+                if (dlg.run() == Gtk.ResponseType.OK) {
+                    connect_server(dlg.host, dlg.port, dlg.ssl, dlg.channel);
+                }
+                dlg.destroy();
+                return false;
+            });
         });
         application.add_action(action);
 
@@ -174,7 +197,6 @@ public class DummyClient : Gtk.ApplicationWindow
         layout.pack_start(scroll, true, true, 0);
 
         input = new Gtk.Entry();
-        input.set_placeholder_text("Write a message");
         input.activate.connect(send_text);
         layout.pack_end(input, false, false, 0);
 
@@ -187,7 +209,7 @@ public class DummyClient : Gtk.ApplicationWindow
         };
 
         /* Need to fix this! Make it an option, and soon! */
-        connect_server("localhost", 6667, false);
+        //connect_server("localhost", 6667, false);
 
         set_size_request(800, 550);
     }
@@ -303,6 +325,159 @@ public class JoinChannelDialog : Gtk.Dialog
 
         entry.margin = 10;
         get_content_area().show_all();
+    }
+}
+
+public class ConnectDialog : Gtk.Dialog
+{
+
+    public string host { public get; private set; }
+    public uint16 port { public get; private set; }
+    public bool ssl { public get; private set; }
+    public string channel { public get; private set; }
+    public string nickname { public get; private set; }
+
+    private Gtk.Entry nick_ent;
+    private Gtk.Entry host_ent;
+    private Gtk.Widget con;
+    private Gtk.CheckButton check;
+
+    public ConnectDialog(Gtk.Window parent)
+    {
+        Object(transient_for: parent);
+
+        add_button("Cancel", Gtk.ResponseType.CANCEL);
+        var w = add_button("Connect", Gtk.ResponseType.OK);
+        w.get_style_context().add_class("suggested-action");
+        w.set_sensitive(false);
+        con = w;
+
+        var grid = new Gtk.Grid();
+        int row = 0;
+        int column = 0;
+        int norm_size = 1;
+        int max_size = 3;
+
+        /* hostname */
+        var label = new Gtk.Label("Hostname");
+        label.halign = Gtk.Align.START;
+        grid.attach(label, column, row, norm_size, norm_size);
+        var entry = new Gtk.Entry();
+        host_ent = entry;
+        entry.changed.connect(()=> {
+            do_validate();
+        });
+        entry.hexpand = true;
+        grid.attach(entry, column+1, row, max_size-1, norm_size);
+        grid.column_spacing = 12;
+        grid.row_spacing = 12;
+
+        row++;
+        /* port */
+        label = new Gtk.Label("Port");
+        label.halign = Gtk.Align.START;
+        grid.attach(label, column, row, norm_size, norm_size);
+        var scale = new Gtk.SpinButton.with_range(0, 65555, 1);
+        scale.value_changed.connect(()=> {
+            this.port = (uint16)scale.value;
+        });
+        scale.set_value(6667);
+        grid.attach(scale, column+1, row, norm_size, norm_size);
+        check = new Gtk.CheckButton.with_label("Use SSL");
+        check.clicked.connect(()=> {
+            this.ssl = check.active;
+        });
+        grid.attach(check, column+2, row, norm_size, norm_size);
+
+        /* user info, not supporting additional ident features yet.. */
+        row++;
+        label = new Gtk.Label("Nickname");
+        label.halign = Gtk.Align.START;
+        grid.attach(label, column, row, norm_size, norm_size);
+        entry = new Gtk.Entry();
+        nick_ent = entry;
+        entry.text = Environment.get_user_name();
+        entry.hexpand = true;
+        grid.attach(entry, column+1, row, max_size-1, norm_size);
+
+        /* Nick validation.. */
+        entry.changed.connect(()=> {
+            do_validate();
+        });
+
+        row++;
+        /* channel */
+        label = new Gtk.Label("Channel");
+        label.halign = Gtk.Align.START;
+        grid.attach(label, column, row, norm_size, norm_size);
+        entry = new Gtk.Entry();
+        entry.hexpand = true;
+        entry.changed.connect(()=> {
+            channel = entry.text;
+        });
+        grid.attach(entry, column+1, row, max_size-1, norm_size);
+
+        grid.margin_bottom = 6;
+
+        get_content_area().set_border_width(10);
+        get_content_area().add(grid);
+        get_content_area().show_all();
+    }
+
+    private void do_validate()
+    {
+        unichar[] spcls = {
+            '[', ']', '\\', '\'', '_', '^', '{', '|', '}'
+        };
+
+        /* Test nick first.. */
+        var txt = nick_ent.text;
+        bool valid = true;
+        string? fail = "";
+        if (txt.strip() == "") {
+            valid = false;
+            fail = "Nickname must be entered";
+        } else {
+            valid = true;
+            if (!(txt.get_char(0) in spcls)) {
+                if(!txt.get_char(0).isalpha()) {
+                    valid = false;
+                    fail = "Nicknames may only start with: a-z, A-Z, [] \\ ' _ ^ { | } ";
+                }
+            }
+            if (txt.length > 1) {
+                for (int i=1; i < txt.length; i++) {
+                    unichar c = txt.get_char(i);
+                    if (!(c in spcls)) {
+                        if (!c.isalnum()) {
+                            if (c != '-') {
+                                valid = false;
+                                fail = "Nicknames may only contain: a-z, A-Z, 0-9, [] \\ ' _ ^ { | } -";
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (!valid) {
+            nick_ent.set_icon_from_icon_name(Gtk.EntryIconPosition.PRIMARY, "dialog-error-symbolic");
+            nick_ent.set_icon_tooltip_text(Gtk.EntryIconPosition.PRIMARY, fail);
+            con.set_sensitive(false);
+            return;
+        } else {
+            nick_ent.set_icon_from_icon_name(Gtk.EntryIconPosition.PRIMARY, null);
+            nick_ent.set_icon_tooltip_text(Gtk.EntryIconPosition.PRIMARY, null);
+        }
+
+        if (host_ent.text.strip() == "") {
+            con.set_sensitive(false);
+            return;
+        }
+
+        host = host_ent.text;
+        nickname = nick_ent.text;
+        con.set_sensitive(true);
     }
 }
 
