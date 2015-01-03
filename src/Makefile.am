@@ -11,11 +11,11 @@ dummy_bot_SOURCES = \
 
 dummy_bot_CFLAGS = \
 	$(GOBJECT_CFLAGS) \
-	$(GIO_UNIX_CFLAGS)
+	$(GIO_CFLAGS)
 
 dummy_bot_LDADD = \
 	$(GOBJECT_LIBS) \
-	$(GIO_UNIX_LIBS)
+	$(GIO_LIBS)
 
 dummy_bot_VALAFLAGS = \
 	$(VALAFLAGS)
@@ -39,12 +39,12 @@ dummy_client_SOURCES = \
 
 dummy_client_CFLAGS = \
 	$(GOBJECT_CFLAGS) \
-	$(GIO_UNIX_CFLAGS) \
+	$(GIO_CFLAGS) \
 	$(GTK_CFLAGS)
 
 dummy_client_LDADD = \
 	$(GOBJECT_LIBS) \
-	$(GIO_UNIX_LIBS) \
+	$(GIO_LIBS) \
 	$(GTK_LIBS)
 
 dummy_client_VALAFLAGS = \

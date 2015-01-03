@@ -24,7 +24,7 @@ AS_IF([test "x$enable_windows_build" = "xyes"],
 AM_CONDITIONAL([BUILD_WINDOWS], [test x$enable_windows_build = x"yes"])
 
 if test "x$enable_windows_build" = "xyes"; then
-    VALAFLAGS="--define WINDOWSBUILD --pkg gio-windows-2.0"
+    VALAFLAGS="--define WINDOWSBUILD --pkg gio-2.0"
     PKG_CHECK_MODULES([GIO_WINDOWS], [gio-windows-2.0 >= 2.40.0])
 else
     VALAFLAGS="--pkg gio-unix-2.0"
