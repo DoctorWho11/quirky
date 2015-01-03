@@ -377,6 +377,7 @@ public class IrcSidebar : Gtk.Box
             selected_row.selected = true;
             selected_row.thaw_notify();
             we_change = false;
+            selected_row.activate();
         }
 
         return exp;

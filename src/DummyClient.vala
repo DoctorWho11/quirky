@@ -54,6 +54,8 @@ public class DummyClient : Gtk.ApplicationWindow
         core.connecting.connect((s,h,p,m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
             main_view.add_message(buf, "", m, IrcTextType.SERVER);
+            /* Just ensures we don't use nicknames for sizing of our margin/indent */
+            main_view.update_tabs(buf, " ", true);
         });
         core.nick_error.connect(on_nick_error);
 
