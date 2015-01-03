@@ -204,7 +204,7 @@ public class DummyClient : Gtk.ApplicationWindow
         }
 
         /* TODO: Add command parser!! */
-        if (message.down().has_prefix("/me")) {
+        if (message.has_prefix("/me")) {
             message = input.text.split("/me ")[1];
             action = true;
         }
