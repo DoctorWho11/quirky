@@ -329,14 +329,22 @@ public class IrcTextWidget : Gtk.TextView
         }
         update_tabs(buf, whom);
 
+        scroll_to_bottom(buffer);
+    }
+
+    public void scroll_to_bottom(Gtk.TextBuffer? buffer)
+    {
         /* Temp: Autoscroll when appending, need to check this later.. */
-        if (buffer == get_buffer()) {
-            /* fwiw we need to just keep one single mark. */
-            buffer.get_end_iter(out i);
-            var m = buffer.create_mark(null, i, true);
-            scroll_mark_onscreen(m);
-            buffer.delete_mark(m);
+        if (buffer != get_buffer()) {
+            return;
         }
+        Gtk.TextIter i;
+
+        /* fwiw we need to just keep one single mark. */
+        buffer.get_end_iter(out i);
+        var m = buffer.create_mark(null, i, true);
+        scroll_mark_onscreen(m);
+        buffer.delete_mark(m);
     }
 
     /**

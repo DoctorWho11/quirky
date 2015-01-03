@@ -22,8 +22,6 @@ public class DummyClient : Gtk.ApplicationWindow
 
     HashTable<IrcCore?,SidebarExpandable> roots;
 
-    bool set_view = false;
-
     private void update_actions()
     {
         (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected);
@@ -37,8 +35,7 @@ public class DummyClient : Gtk.ApplicationWindow
             this.core = core;
             update_actions();
             var buf = get_named_buffer(core, "\\ROOT\\");
-            main_view.set_buffer(buf);
-            main_view.update_tabs(buf, core.ident.nick);
+            set_buffer(buf);
         });
         /* Need moar status in window.. */
         message("Connecting to %s:%d", host, port);
@@ -56,9 +53,6 @@ public class DummyClient : Gtk.ApplicationWindow
             if (aj != null) {
                 core.join_channel(aj);
             }
-            if (!set_view) {
-                this.core = core;
-            }
             update_actions();
         });
         core.ctcp.connect(on_ctcp);
@@ -73,8 +67,7 @@ public class DummyClient : Gtk.ApplicationWindow
                     var buf = get_named_buffer(core, c);
                     this.core = item.get_data("icore");
                     this.target = item.get_data("ichannel");
-                    main_view.set_buffer(buf);
-                    main_view.update_tabs(buf, core.ident.nick);
+                    set_buffer(buf);
                     update_actions();
                 });
                 root.set_expanded(true);
@@ -109,12 +102,6 @@ public class DummyClient : Gtk.ApplicationWindow
         } else {
             buf = new Gtk.TextBuffer(main_view.tags);
             buffers[compname] = buf;
-        }
-
-        if (!set_view) {
-            main_view.set_buffer(buf);
-            main_view.update_tabs(buf, core.ident.nick);
-            set_view = true;
         }
 
         return buffers[compname];
@@ -313,11 +300,17 @@ public class DummyClient : Gtk.ApplicationWindow
                 this.target = item.get_data("iuser");
                 this.core = item.get_data("icore");
                 var buf = get_named_buffer(core, this.target);
-                main_view.set_buffer(buf);
-                main_view.update_tabs(buf, core.ident.nick);
+                set_buffer(buf);
                 update_actions();
             });
         }
+    }
+
+    private void set_buffer(Gtk.TextBuffer buffer)
+    {
+        main_view.set_buffer(buffer);
+        main_view.update_tabs(buffer, core.ident.nick);
+        main_view.scroll_to_bottom(buffer);
     }
 
     protected void on_messaged(IrcCore core, IrcUser user, string target, string message, IrcMessageType type)
