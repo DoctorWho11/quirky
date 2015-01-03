@@ -18,8 +18,16 @@ dummy_bot_LDADD = \
 	$(GIO_UNIX_LIBS)
 
 dummy_bot_VALAFLAGS = \
-	--pkg gio-unix-2.0
+	$(VALAFLAGS)
 
+
+if BUILD_WINDOWS
+	dummy_bot_CFLAGS += $(GIO_WINDOWS_CFLAGS)
+	dummy_bot_LDADD += $(GIO_WINDOWS_LIBS)
+else
+	dummy_bot_CFLAGS += $(GIO_UNIX_CFLAGS)
+	dummy_bot_LDADD += $(GIO_UNIX_LIBS)
+endif
 
 
 dummy_client_SOURCES = \
@@ -40,5 +48,13 @@ dummy_client_LDADD = \
 	$(GTK_LIBS)
 
 dummy_client_VALAFLAGS = \
-	--pkg gio-unix-2.0 \
-	--pkg gtk+-3.0
+	--pkg gtk+-3.0 \
+	$(VALAFLAGS)
+
+if BUILD_WINDOWS
+	dummy_client_CFLAGS += $(GIO_WINDOWS_CFLAGS)
+	dummy_client_LDADD += $(GIO_WINDOWS_LIBS)
+else
+	dummy_client_CFLAGS += $(GIO_UNIX_CFLAGS)
+	dummy_client_LDADD += $(GIO_UNIX_LIBS)
+endif
