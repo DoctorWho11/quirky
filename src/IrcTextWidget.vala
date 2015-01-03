@@ -322,7 +322,11 @@ public class IrcTextWidget : Gtk.TextView
             }
             buf.insert_with_tags_by_name(i, "\n", -1, "default");
         }
-        buf.set_data("_lastnick", whom);
+        if (ttype == IrcTextType.MESSAGE) {
+            buf.set_data("_lastnick", whom);
+        } else {
+            buf.set_data("_lastnick", null);
+        }
         update_tabs(buf, whom);
 
         /* Temp: Autoscroll when appending, need to check this later.. */
