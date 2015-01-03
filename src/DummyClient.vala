@@ -196,7 +196,7 @@ public class DummyClient : Gtk.ApplicationWindow
         if (input.text.length > 0) {
             string message = input.text;
             if (core == null) {
-                error("MISSING IRCCORE!");
+                warning("MISSING IRCCORE!");
                 return;
             }
             core.send_message(target, message);
