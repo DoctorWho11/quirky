@@ -68,6 +68,15 @@ public enum IrcConnectionStatus {
     REGISTERING
 }
 
+public enum IrcNickError {
+    NO_NICK,
+    INVALID,
+    IN_USE,
+    COLLISION,
+    UNAVAILABLE,
+    RESTRICTED /* We don't use this.. */
+}
+
 private struct _olock { int x; }
 
 public class IrcCore : Object
@@ -144,6 +153,24 @@ public class IrcCore : Object
      * @param privmsg Whether this was a privmsg (i.e. not NOTICE)
      */
     public signal void ctcp(IrcUser user, string command, string text, bool privmsg);
+
+    /**
+     * Issued upon a nick error
+     *
+     * @param nick The nick that caused the issue
+     * @param error Reason for the nick error
+     * @param human Human readable reason for the error
+     */
+    public signal void nick_error(string nick, IrcNickError error, string human);
+
+    /**
+     * Emitted when a nickname is changed
+     *
+     * @param user The user who nick-changed
+     * @param nick The new nick they are known by
+     * @param us Whether we changed nick
+     */
+    public signal void nick_changed(IrcUser user, string nick, bool us);
 
     /**
      * Indicates we've established our connection to the IRC network, and have
@@ -400,6 +427,10 @@ public class IrcCore : Object
         /* TODO: Support all RFC numerics */
         switch (numeric) {
             case IRC.RPL_WELCOME:
+                string[] params;
+                parse_simple(sender, remnant, null, out params, null);
+                /* If we changed nick during registration, we resync here. */
+                ident.nick = params[0];
                 established();
                 break;
 
@@ -465,6 +496,28 @@ public class IrcCore : Object
                     _motd += "\n";
                 }
                 motd(_motd, msg);
+                break;
+
+            /* Nick error handling */
+            case IRC.ERR_NICKNAMEINUSE:
+                string msg;
+                parse_simple(sender, remnant, null, null, out msg);
+                nick_error(ident.nick, IrcNickError.IN_USE, msg);
+                break;
+            case IRC.ERR_NONICKNAMEGIVEN:
+                string msg;
+                parse_simple(sender, remnant, null, null, out msg);
+                nick_error(ident.nick, IrcNickError.NO_NICK, msg);
+                break;
+            case IRC.ERR_ERRONEUSNICKNAME:
+                string msg;
+                parse_simple(sender, remnant, null, null, out msg);
+                nick_error(ident.nick, IrcNickError.INVALID, msg);
+                break;
+            case IRC.ERR_NICKCOLLISION:
+                string msg;
+                parse_simple(sender, remnant, null, null, out msg);
+                nick_error(ident.nick, IrcNickError.COLLISION, msg);
                 break;
             default:
                 break;
@@ -570,6 +623,16 @@ public class IrcCore : Object
                 }
 
                 user_kicked(user, params[0], params[1], reason);
+                break;
+            case "NICK":
+                IrcUser user = user_from_hostmask(sender);
+                /* Update our own nick */
+                if (user.nick == ident.nick) {
+                    ident.nick = remnant;
+                    nick_changed(user, remnant, true);
+                } else {
+                    nick_changed(user, remnant, false);
+                }
                 break;
             case "QUIT":
                 IrcUser user;
@@ -735,6 +798,16 @@ public class IrcCore : Object
         } else {
             write_socket("NAMES\r\n");
         }
+    }
+
+    /**
+     * Attempt to change nickname
+     *
+     * @param nick The new nickname
+     */
+    public void set_nick(string nick)
+    {
+        write_socket("NICK %s\r\n", nick);
     }
 }
 
