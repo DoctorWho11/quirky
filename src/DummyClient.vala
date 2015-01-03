@@ -296,10 +296,41 @@ public class DummyClient : Gtk.ApplicationWindow
         main_view.update_tabs(buffer, core.ident.nick);
     }
 
+    /**
+     * Ensure we have a view for private messages
+     */
+    private void ensure_view(IrcCore core, Gtk.TextBuffer buffer, string nick)
+    {
+        SidebarItem? item = buffer.get_data("sitem");
+        if (item == null) {
+            var root = roots[core];
+            item = root.add_item(nick, "user-available-symbolic");
+            buffer.set_data("sitem", item);
+            item.set_data("iuser", nick);
+            item.set_data("icore", core);
+
+            item.activated.connect(()=> {
+                this.target = item.get_data("iuser");
+                this.core = item.get_data("icore");
+                var buf = get_named_buffer(core, this.target);
+                main_view.set_buffer(buf);
+                main_view.update_tabs(buf, core.ident.nick);
+                update_actions();
+            });
+        }
+    }
+
     protected void on_messaged(IrcCore core, IrcUser user, string target, string message, IrcMessageType type)
     {
-        /* Right now we don't check PMs, etc. */
-        var buffer = get_named_buffer(core, target);
+        Gtk.TextBuffer? buffer;
+
+        if ((type & IrcMessageType.PRIVATE) != 0) {
+            /* private message.. */
+            buffer = get_named_buffer(core, user.nick);
+            ensure_view(core, buffer, user.nick);
+        } else {
+            buffer = get_named_buffer(core, target);
+        }
         if ((type & IrcMessageType.ACTION) != 0) {
             main_view.add_message(buffer, user.nick, message, IrcTextType.ACTION);
         } else {
