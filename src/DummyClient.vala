@@ -219,7 +219,7 @@ public class DummyClient : Gtk.ApplicationWindow
         layout.pack_end(input, false, false, 0);
 
         set_default_size(800, 550);
-
+        window_position = Gtk.WindowPosition.CENTER;
         Idle.add(()=> {
             show_connect_dialog();
             return false;
