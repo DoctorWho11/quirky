@@ -87,6 +87,9 @@ public class IrcCore
     private IOChannel ioc;
     private DataOutputStream dos;
 
+    /** Allows tracking of connected state.. */
+    public bool connected { public get; private set; }
+
     /**
      * Emitted when we start recieving the MOTD
      */
@@ -137,6 +140,13 @@ public class IrcCore
         outm.x = 0;
         this.id = IrcCore.sid;
         IrcCore.sid++;
+
+        disconnected.connect(()=> {
+            connected = false;
+        });
+        established.connect(()=> {
+            connected = true;
+        });
     }
 
     public async void connect(string host, uint16 port, bool use_ssl)

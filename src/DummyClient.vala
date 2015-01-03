@@ -25,12 +25,18 @@ public class DummyClient : Gtk.ApplicationWindow
 
     bool set_view = false;
 
+    private void update_actions()
+    {
+        (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected);
+    }
+
     private void connect_server(string host, uint16 port, bool ssl)
     {
         var header = sidebar.add_expandable(host, "network-server-symbolic");
         header.activated.connect(()=> {
             IrcCore core = header.get_data("icore");
             this.core = core;
+            update_actions();
             var buf = get_named_buffer(core, "\\ROOT\\");
             main_view.set_buffer(buf);
             main_view.update_tabs(buf, ident.nick);
@@ -45,8 +51,13 @@ public class DummyClient : Gtk.ApplicationWindow
         core.messaged.connect(on_messaged);
         core.established.connect(()=> {
             core.join_channel("#evolveos");
+            if (!set_view) {
+                this.core = core;
+            }
+            update_actions();
         });
         core.joined_channel.connect((u,c)=> {
+            update_actions();
             if (u.nick == ident.nick) {
                 var root = roots[core];
                 var item = root.add_item(c, "user-available-symbolic");
@@ -58,6 +69,7 @@ public class DummyClient : Gtk.ApplicationWindow
                     this.target = item.get_data("ichannel");
                     main_view.set_buffer(buf);
                     main_view.update_tabs(buf, ident.nick);
+                    update_actions();
                 });
                 var buf = get_named_buffer(core, c); /* do nothing :P */
                 main_view.add_message(buf, "", @"You have joined $(c)", IrcTextType.JOIN);
@@ -109,6 +121,30 @@ public class DummyClient : Gtk.ApplicationWindow
         set_title("DummyClient");
         set_titlebar(header);
         header.set_title("DummyClient");
+
+        /* actions.. */
+        var btn = new Gtk.MenuButton();
+        var img = new Gtk.Image.from_icon_name("list-add-symbolic", Gtk.IconSize.BUTTON);
+        btn.add(img);
+        header.pack_start(btn);
+        var menu = new Menu();
+        menu.append("Connect to server", "app.connect");
+        menu.append("Join channel", "app.join_channel");
+        btn.set_menu_model(menu);
+        btn.set_use_popover(true);
+
+        /* connect to server.. */
+        var action = new SimpleAction("join_channel", null);
+        action.activate.connect(()=> {
+            var dlg = new JoinChannelDialog(this);
+            if (dlg.run() == Gtk.ResponseType.OK) {
+                core.join_channel(dlg.response_text);
+            }
+            dlg.destroy();
+        });
+        application.add_action(action);
+
+        update_actions();
 
         set_icon_name("xchat");
 
@@ -176,6 +212,50 @@ public class DummyClient : Gtk.ApplicationWindow
         /* Right now we don't check PMs, etc. */
         var buffer = get_named_buffer(core, target);
         main_view.add_message(buffer, user.nick, message, IrcTextType.MESSAGE);
+    }
+}
+
+public class JoinChannelDialog : Gtk.Dialog
+{
+
+    public string response_text { public get; private set; }
+
+    public JoinChannelDialog(Gtk.Window parent)
+    {
+        Object(transient_for: parent);
+        response_text = "#";
+
+        add_button("Cancel", Gtk.ResponseType.CANCEL);
+        var w = add_button("Join", Gtk.ResponseType.OK);
+        w.get_style_context().add_class("suggested-action");
+        w.set_sensitive(false);
+
+        var label = new Gtk.Label("Which channel do you want to join?");
+        (get_content_area() as Gtk.Box).pack_start(label, false, false, 2);
+        label.margin = 10;
+
+        var entry = new Gtk.Entry();
+        entry.set_text(response_text);
+        entry.changed.connect(()=> {
+            if (entry.text.strip() == "" || entry.text.length < 2) {
+                w.set_sensitive(false);
+                return;
+            } else {
+                w.set_sensitive(true);
+            }
+            response_text = entry.text;
+        });
+        entry.activate.connect(()=> {
+            if (response_text.strip() == "" || response_text.length < 2) {
+                return;
+            }
+            response(Gtk.ResponseType.OK);
+        });
+
+        (get_content_area() as Gtk.Box).pack_start(entry, false, false, 2);
+
+        entry.margin = 10;
+        get_content_area().show_all();
     }
 }
 
