@@ -59,6 +59,13 @@ public class DummyClient : Gtk.ApplicationWindow
         });
         core.nick_error.connect(on_nick_error);
 
+        core.server_info.connect((i)=> {
+            if (i.network != null) {
+                var root = roots[core];
+                root.label = i.network;
+            }
+        });
+
         core.connect.begin(host, port, ssl);
         core.messaged.connect(on_messaged);
         core.established.connect(()=> {

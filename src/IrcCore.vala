@@ -77,6 +77,17 @@ public enum IrcNickError {
     RESTRICTED /* We don't use this.. */
 }
 
+/**
+ * Simple info from a server using RPL_ISUPPORT
+ */
+public struct ServerInfo {
+    int away_length;
+    int kick_length;
+    int nick_length;
+    int topic_length;
+    string network;
+}
+
 private struct _olock { int x; }
 
 public class IrcCore : Object
@@ -85,6 +96,8 @@ public class IrcCore : Object
     SocketConnection? conn;
     public IrcIdentity ident;
     Cancellable cancel;
+
+    private ServerInfo sinfo;
 
     public static int64 sid = 0;
     public int64 id;
@@ -178,6 +191,14 @@ public class IrcCore : Object
      */
     public signal void established();
 
+    /**
+     * May be emitted multiple times as we recieve more RPL_ISUPPORT data from
+     * the server.
+     *
+     * @param info Currently built serverinfo object
+     */
+    public signal void server_info(ServerInfo info);
+
     public IrcCore(IrcIdentity ident)
     {
         /* Todo: Validate */
@@ -200,6 +221,8 @@ public class IrcCore : Object
         established.connect(()=> {
             connected = true;
         });
+
+        sinfo = ServerInfo();
     }
 
     private bool parse_ctcp(string msg, out string cmd, out string content)
@@ -439,6 +462,61 @@ public class IrcCore : Object
                 established();
                 break;
 
+            /* Server info parsing, goodie! */
+            case IRC.RPL_ISUPPORT:
+                string[] params;
+                parse_simple(sender, remnant, null, out params, null, true);
+                if (params.length == 1) {
+                    /* Not yet handled. */
+                    debug("Got RPL_BOUNCE, not RPL_ISUPPORT");
+                    break;
+                }
+                string[] seps = { "=", ":" };
+                for (int i = 1; i < params.length; i++) {
+                    string key = null;
+                    string val = null;
+                    foreach (var sep in seps) {
+                        if (sep in params[i]) {
+                            var splits = params[i].split(sep);
+                            key = splits[0];
+                            if (splits.length > 1) {
+                                val = string.joinv(sep, splits[1:splits.length]);
+                            } else {
+                                /* made a booboo */
+                                key = params[i];
+                            }
+                            break;
+                        }
+                    }
+                    if (key == null) {
+                        key = params[i];
+                    }
+                    /* all require vals */
+                    if (val == null) {
+                        continue;
+                    }
+                    switch (key) {
+                        case "NETWORK":
+                            sinfo.network = val;
+                            break;
+                        case "AWAYLEN":
+                            sinfo.away_length = int.parse(val);
+                            break;
+                        case "KICKLEN":
+                            sinfo.kick_length = int.parse(val);
+                            break;
+                        case "NICKLEN":
+                            sinfo.nick_length = int.parse(val);
+                            break;
+                        case "TOPICLEN":
+                            sinfo.topic_length = int.parse(val);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                server_info(this.sinfo);
+                break;
             /* Names handling.. */
             case IRC.RPL_NAMREPLY:
                 string[] params; /* nick, mode, channel */
@@ -661,12 +739,18 @@ public class IrcCore : Object
      * @param user Where to store the IrcUser info
      * @param params Where to store any parameters (if wanted.)
      * @param rhs Where to store right-hand-side portion of ":" message
+     * @param last_colon Whether to use the last_colon as the separator, needed for some numerics
      */
-    protected void parse_simple(string sender, string remnant, out IrcUser user, out string[]? params, out string rhs)
+    protected void parse_simple(string sender, string remnant, out IrcUser user, out string[]? params, out string rhs, bool last_colon = false)
     {
         user = user_from_hostmask(sender);
 
-        var i = remnant.index_of(":");
+        int i;
+        if (last_colon) {
+            i = remnant.last_index_of(":");
+        } else {
+            i = remnant.index_of(":");
+        }
         if (i < 0 || i == remnant.length) {
             params = null;
             rhs = remnant;

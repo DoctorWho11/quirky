@@ -12,6 +12,8 @@
 public enum IRC {
     RPL_WELCOME = 001, /* Successful connection to IRC/registered */
 
+    RPL_ISUPPORT = 005, /* Actually RPL_BOUNCE, but hey. */
+    RPL_BOUNCE = 005, /* Yeah... */
     RPL_NAMREPLY = 353, /* Name list */
     RPL_ENDOFNAMES = 366, /* End of names list */
 
