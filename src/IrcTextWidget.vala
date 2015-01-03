@@ -45,7 +45,7 @@ public class IrcTextWidget : Gtk.TextView
     public bool use_timestamp {
         public set {
             tags.lookup("timestamp").invisible = !value;
-            update_tabs(get_buffer(), null);
+            update_tabs(get_buffer(), null, true);
         }
         public get {
             return !(tags.lookup("timestamp").invisible);
@@ -197,7 +197,7 @@ public class IrcTextWidget : Gtk.TextView
         }
 
         var time = new DateTime.now_local();
-        var stamp = time.format("[%H:%M:%S]  ");
+        var stamp = time.format("[%H:%M:%S] ");
         if (stamp.length > timestamp_length) {
             timestamp_length = stamp.length;
         }
@@ -378,7 +378,7 @@ public class IrcTextWidget : Gtk.TextView
     /**
      * Update tabstop to align nicks and text properly
      */
-    public void update_tabs(Gtk.TextBuffer? buffer, string? nick)
+    public void update_tabs(Gtk.TextBuffer? buffer, string? nick, bool invalidate = false)
     {
         if (buffer == null) {
             return;
@@ -395,11 +395,12 @@ public class IrcTextWidget : Gtk.TextView
         if (nick == "" || nick == null) {
             nick = buffer.get_data("_lastnick");
             if (nick == null) {
-                return;
+                /* Set up some default spacing.. be sane */
+                nick = "    ";
             }
         }
 
-        if (lwidth >= nick.length) {
+        if (lwidth >= nick.length && !invalidate) {
             return;
         }
         /* sane default.. ? */

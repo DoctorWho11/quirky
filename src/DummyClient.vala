@@ -133,6 +133,8 @@ public class DummyClient : Gtk.ApplicationWindow
         set_titlebar(header);
         header.set_title("DummyClient");
 
+        main_view = new IrcTextWidget();
+
         /* actions.. */
         var btn = new Gtk.MenuButton();
         btn.margin_left = 6;
@@ -170,6 +172,19 @@ public class DummyClient : Gtk.ApplicationWindow
         });
         application.add_action(action);
 
+        btn = new Gtk.MenuButton();
+        img = new Gtk.Image.from_icon_name("emblem-system-symbolic", Gtk.IconSize.BUTTON);
+        btn.add(img);
+        menu = new Menu();
+        menu.append("Show timestamps", "app.timestamps");
+        btn.set_menu_model(menu);
+        btn.set_use_popover(true);
+        header.pack_end(btn);
+
+        /* toggle timestamps */
+        var paction = new PropertyAction("timestamps", main_view, "use_timestamp");
+        application.add_action(paction);
+
         update_actions();
 
         set_icon_name("xchat");
@@ -194,7 +209,6 @@ public class DummyClient : Gtk.ApplicationWindow
 
         scroll = new Gtk.ScrolledWindow(null, null);
         scroll.set_shadow_type(Gtk.ShadowType.IN);
-        main_view = new IrcTextWidget();
         main_view.set_editable(false);
         main_view.use_timestamp = true;
         scroll.add(main_view);
