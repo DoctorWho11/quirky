@@ -47,6 +47,8 @@ public class DummyClient : Gtk.ApplicationWindow
         roots[core] = header;
         header.set_data("icore", core);
         core.set_data("autojoin", autojoin);
+        /* Now switch view.. */
+        sidebar.select_row(header);
         core.connect.begin(host, port, ssl);
         core.messaged.connect(on_messaged);
         core.established.connect(()=> {
@@ -75,6 +77,7 @@ public class DummyClient : Gtk.ApplicationWindow
                     main_view.update_tabs(buf, core.ident.nick);
                     update_actions();
                 });
+                root.set_expanded(true);
                 var buf = get_named_buffer(core, c); /* do nothing :P */
                 main_view.add_message(buf, "", @"You have joined $(c)", IrcTextType.JOIN);
             } else {

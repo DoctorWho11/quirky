@@ -219,6 +219,17 @@ public class SidebarExpandable : Gtk.Box
         queue_draw();
     }
 
+    public void set_expanded(bool exp)
+    {
+        var kids = revealer_box.get_children();
+        if (kids == null || kids.length() == 0) {
+            return;
+        }
+        string icon = exp ? "list-remove-symbolic" : "list-add-symbolic";
+        revealer.set_reveal_child(exp);
+        (_expand.get_image() as Gtk.Image).set_from_icon_name(icon, Gtk.IconSize.MENU);
+    }
+
     /**
      * Construct a new SidebarExpandable
      *
@@ -318,6 +329,11 @@ public class IrcSidebar : Gtk.Box
     {
         Object(orientation: Gtk.Orientation.VERTICAL);
         selected_row = null;
+    }
+
+    public void select_row(SidebarExpandable? row)
+    {
+        on_row_click(row);
     }
 
     private void on_row_click(SidebarExpandable? source)
