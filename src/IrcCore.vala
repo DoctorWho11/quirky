@@ -253,7 +253,6 @@ public class IrcCore : Object
                 this.client = client;
             }
             connection.socket.set_blocking(false);
-            var dis = new DataInputStream(connection.input_stream);
             dos = new DataOutputStream(connection.output_stream);
 #if WINDOWSBUILD
             ioc = new IOChannel.win32_socket(connection.socket.fd);
@@ -264,14 +263,10 @@ public class IrcCore : Object
             /* Attempt identification immediately, get the ball rolling */
             connecting(IrcConnectionStatus.REGISTERING, addr.to_string(), (int)port, "Logging in...");
 
+            ioc.add_watch(IOCondition.IN | IOCondition.HUP, reader);
             write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
             write_socket("NICK %s\r\n", ident.nick);
 
-            /* Now we loop. */
-            string line = null;
-            while ((line = yield dis.read_line_async(Priority.DEFAULT, cancel)) != null) {
-                yield handle_line(line);
-            }
         } catch (Error e) {
             message(e.message);
             if (!cancel.is_cancelled()) {
@@ -293,6 +288,32 @@ public class IrcCore : Object
         } else if (e == SocketClientEvent.TLS_HANDSHAKED) {
             message("Handshake complete");
         }
+    }
+
+    protected bool reader(IOChannel source, IOCondition cond)
+    {
+        if (cond == IOCondition.HUP) {
+            disconnected();
+            return false;
+        }
+
+        IOStatus stat = IOStatus.NORMAL;
+        try {
+            size_t len;
+            string? ret = null;
+            size_t term;
+            stat = source.read_line(out ret, out len, out term);
+            if (ret != null) {
+                handle_line(ret);
+            }
+        } catch (Error e) {
+            warning("Got IO Error: %s", e.message);
+            if (stat == IOStatus.ERROR || stat == IOStatus.EOF) {
+                disconnected();
+                return false;
+            }
+        }
+        return true;
     }
 
     protected bool dispatcher(IOChannel source, IOCondition cond)
@@ -381,7 +402,7 @@ public class IrcCore : Object
      *
      * @param input The input line from the server
      */
-    async void handle_line(string input)
+    void handle_line(string input)
     {
         var line = input;
         /* You'd surely hope so. */
@@ -405,14 +426,14 @@ public class IrcCore : Object
 
         if (!sender.has_prefix(":")) {
             /* Special command */
-            yield handle_command(sender, sender, line, remnant, true);
+            handle_command(sender, sender, line, remnant, true);
         } else {
             string command = segments[1];
             if (is_number(command)) {
                 var number = int.parse(command);
-                yield handle_numeric(sender, number, line, remnant);
+                handle_numeric(sender, number, line, remnant);
             } else {
-                yield handle_command(sender, command, line, remnant);
+                handle_command(sender, command, line, remnant);
             }
         }
         stdout.printf("%s\n", line);
@@ -426,9 +447,8 @@ public class IrcCore : Object
      * @param line The unprocessed line
      * @param remnant Remainder of processed line
      */
-    async void handle_numeric(string sender, int numeric, string line, string? remnant)
+    void handle_numeric(string sender, int numeric, string line, string? remnant)
     {
-        /* NOTE: Doesn't need to be async *yet* but will in future.. */
         /* TODO: Support all RFC numerics */
         switch (numeric) {
             case IRC.RPL_WELCOME:
@@ -538,7 +558,7 @@ public class IrcCore : Object
      * @param remnant Remainder of processed line
      * @param special Whether this is a special case, like PING or ERROR
      */
-    async void handle_command(string sender, string command, string line, string? remnant, bool special = false)
+    void handle_command(string sender, string command, string line, string? remnant, bool special = false)
     {
         if (special) {
             switch (command) {
