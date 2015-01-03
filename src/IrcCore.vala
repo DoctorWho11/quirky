@@ -255,7 +255,11 @@ public class IrcCore : Object
             connection.socket.set_blocking(false);
             var dis = new DataInputStream(connection.input_stream);
             dos = new DataOutputStream(connection.output_stream);
+#if WINDOWSBUILD
+            ioc = new IOChannel.win32_socket(connection.socket.fd);
+#else
             ioc = new IOChannel.unix_new(connection.socket.fd);
+#endif
 
             /* Attempt identification immediately, get the ball rolling */
             connecting(IrcConnectionStatus.REGISTERING, addr.to_string(), (int)port, "Logging in...");
