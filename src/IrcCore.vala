@@ -633,6 +633,18 @@ public class IrcCore
     }
 
     /**
+     * Send a CTCP ACTION
+     *
+     * @note This is the /me command in IRC clients, i.e. /me is a loser
+     * @param taget An online nick, or a joined IRC channel
+     * @param action The "action string" to send
+     */
+    public void send_action(string target, string action)
+    {
+        write_socket(@"PRIVMSG %s :$(CTCP_PREFIX)ACTION %s$(CTCP_PREFIX)\r\n", target, action);
+    }
+
+    /**
      * Quit from the IRC network.
      *
      * @param quit_msg An optional quit message

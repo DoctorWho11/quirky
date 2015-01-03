@@ -193,19 +193,36 @@ public class DummyClient : Gtk.ApplicationWindow
 
     protected void send_text()
     {
-        if (input.text.length > 0) {
-            string message = input.text;
-            if (core == null) {
-                warning("MISSING IRCCORE!");
-                return;
-            }
-            core.send_message(target, message);
-
-            var buffer = get_named_buffer(core, target);
-            main_view.add_message(buffer, ident.nick, message, IrcTextType.MESSAGE);
-            input.set_text("");
-            main_view.update_tabs(buffer, ident.nick);
+        if (input.text.length < 1) {
+            return;
         }
+        bool action = false;
+        string message = input.text;
+        if (core == null) {
+            warning("MISSING IRCCORE!");
+            return;
+        }
+
+        /* TODO: Add command parser!! */
+        if (message.down().has_prefix("/me")) {
+            message = input.text.split("/me ")[1];
+            action = true;
+        }
+
+        if (message.length == 0) {
+            return;
+        }
+
+        if (action) {
+            core.send_action(target, message);
+        } else {
+            core.send_message(target, message);
+        }
+
+        var buffer = get_named_buffer(core, target);
+        main_view.add_message(buffer, ident.nick, message, action ? IrcTextType.ACTION : IrcTextType.MESSAGE);
+        input.set_text("");
+        main_view.update_tabs(buffer, ident.nick);
     }
 
     protected void on_messaged(IrcCore core, IrcUser user, string target, string message, IrcMessageType type)
