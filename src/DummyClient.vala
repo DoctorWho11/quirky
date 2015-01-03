@@ -207,7 +207,8 @@ public class DummyClient : Gtk.ApplicationWindow
             main_view.update_tabs(buffer, ident.nick);
         }
     }
-    protected void on_messaged(IrcCore core, IrcUser user, string target, string message)
+
+    protected void on_messaged(IrcCore core, IrcUser user, string target, string message, IrcMessageType type)
     {
         /* Right now we don't check PMs, etc. */
         var buffer = get_named_buffer(core, target);

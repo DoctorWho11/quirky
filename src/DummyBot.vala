@@ -78,10 +78,15 @@ public class DummyBot
         this.loop = loop;
     }
 
-    public void on_messaged(IrcUser user, string target, string message)
+    public void on_messaged(IrcUser user, string target, string message, IrcMessageType type)
     {
+        if ((type & IrcMessageType.ACTION) != 0) {
+            stdout.printf("Got action from %s: %s\n", user.nick, message);
+            return;
+        }
+
         // DEMO: Send message back (PM or channel depending on target)
-        if (target == ident.nick) {
+        if ((type & IrcMessageType.PRIVATE) != 0) {
             irc.send_message(user.nick, @"Hello, and thanks for the PM $(user.nick)");
         } else {
             /* Only if we got mentioned.. */

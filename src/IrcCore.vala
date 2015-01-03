@@ -56,6 +56,12 @@ public struct IrcUser {
     string hostname;
 }
 
+public enum IrcMessageType {
+    PRIVATE = 1 << 0,
+    CHANNEL = 1 << 1,
+    ACTION  = 1 << 2,
+}
+
 private struct _olock { int x; }
 
 public class IrcCore
@@ -77,7 +83,7 @@ public class IrcCore
 
     public signal void joined_channel(IrcUser user, string channel);
     public signal void user_quit(IrcUser user, string quit_msg);
-    public signal void messaged(IrcUser user, string target, string message);
+    public signal void messaged(IrcUser user, string target, string message, IrcMessageType type);
     public signal void parted_channel(IrcUser user, string channel, string? reason);
 
     /* All this is to ensure we perform valid non-blocking queued output. Phew. */
@@ -86,6 +92,8 @@ public class IrcCore
     private _olock outm;
     private IOChannel ioc;
     private DataOutputStream dos;
+
+    const unichar CTCP_PREFIX = '\x01';
 
     /** Allows tracking of connected state.. */
     public bool connected { public get; private set; }
@@ -147,6 +155,28 @@ public class IrcCore
         established.connect(()=> {
             connected = true;
         });
+    }
+
+    private bool parse_ctcp(string msg, out string cmd, out string content)
+    {
+        cmd = "";
+        content = "";
+
+        if (!(msg.get_char(0) == '\x01' && msg.get_char(msg.length-1) == '\x01')) {
+            return false;
+        }
+        if (msg.length < 4) {
+            return false;
+        }
+        int index = msg.index_of_char(' ', 1);
+        if (index < 0) {
+            return false;
+        }
+
+        cmd = msg.substring(1,index-1);
+
+        content = msg.substring(index+1, (msg.length-2)-index);
+        return true;
     }
 
     public async void connect(string host, uint16 port, bool use_ssl)
@@ -443,7 +473,22 @@ public class IrcCore
                     warning("Invalid PRIVMSG: more than one target!");
                     break;
                 }
-                messaged(user, params[0], message);
+                string ctcp_command;
+                string ctcp_string;
+                IrcMessageType type;
+                if (params[0] == ident.nick) {
+                    type = IrcMessageType.PRIVATE;
+                } else {
+                    type = IrcMessageType.CHANNEL;
+                }
+                if (parse_ctcp(message, out ctcp_command, out ctcp_string)) {
+                    /* TODO: Add more CTCP support, signal, etc :p */
+                    if (ctcp_command == "ACTION") {
+                        type |= IrcMessageType.ACTION;
+                        message = ctcp_string;
+                    }
+                }
+                messaged(user, params[0], message, type);
                 break;
             case "JOIN":
                 IrcUser user;
