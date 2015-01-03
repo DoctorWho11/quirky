@@ -200,7 +200,7 @@ public class DummyClient : Gtk.ApplicationWindow
         input.activate.connect(send_text);
         layout.pack_end(input, false, false, 0);
 
-        set_size_request(800, 550);
+        set_default_size(800, 550);
 
         Idle.add(()=> {
             show_connect_dialog();
