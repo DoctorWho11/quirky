@@ -155,7 +155,7 @@ public class IrcTextWidget : Gtk.TextView
         set_cursor_visible(false);
         set_editable(false);
 
-        visible_margin = false;
+        visible_margin = true;
 
         tags = new Gtk.TextTagTable();
         var tag = new Gtk.TextTag("default");
