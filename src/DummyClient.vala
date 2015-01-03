@@ -231,20 +231,22 @@ public class DummyClient : Gtk.ApplicationWindow
             message = input.text.split("/me ")[1];
             action = true;
         }
-
         if (message.length == 0) {
             return;
         }
-
-        if (action) {
-            core.send_action(target, message);
-        } else {
-            core.send_message(target, message);
-        }
-
+        message = message.replace("\r","");
         var buffer = get_named_buffer(core, target);
-        main_view.add_message(buffer, ident.nick, message, action ? IrcTextType.ACTION : IrcTextType.MESSAGE);
         input.set_text("");
+
+        /* We really need to think about output throttling. */
+        foreach (var msg in message.split("\n")) {
+            if (action) {
+                core.send_action(target, msg);
+            } else {
+                core.send_message(target, msg);
+            }
+            main_view.add_message(buffer, ident.nick, msg, action ? IrcTextType.ACTION : IrcTextType.MESSAGE);
+        }
         main_view.update_tabs(buffer, ident.nick);
     }
 
