@@ -29,7 +29,8 @@ public enum IrcTextType {
     ACTION,
     JOIN,
     PART,
-    MOTD
+    MOTD,
+    SERVER
 }
 
 /**
@@ -167,6 +168,9 @@ public class IrcTextWidget : Gtk.TextView
             case IrcTextType.PART:
                 default_tags += "m_red";
                 break;
+            case IrcTextType.SERVER:
+                default_tags += "m_brown";
+                break;
             default:
                 break;
         }
@@ -195,8 +199,10 @@ public class IrcTextWidget : Gtk.TextView
                 buf.insert_with_tags_by_name(i, @"$(whom) ", -1, "nickname", "m_" + mcols[nick_index], "default");
             }
         } else {
-            /* Default, right align everything.. */
-            buf.insert_with_tags_by_name(i, "\t", -1, "default");
+            if (ttype != IrcTextType.SERVER) {
+                /* Default, right align everything.. */
+                buf.insert_with_tags_by_name(i, "\t", -1, "default");
+            }
         }
     
         buf.get_end_iter(out i);

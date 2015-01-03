@@ -62,6 +62,12 @@ public enum IrcMessageType {
     ACTION  = 1 << 2,
 }
 
+public enum IrcConnectionStatus {
+    RESOLVING,
+    CONNECTING,
+    REGISTERING
+}
+
 private struct _olock { int x; }
 
 public class IrcCore : Object
@@ -86,6 +92,8 @@ public class IrcCore : Object
     public signal void messaged(IrcUser user, string target, string message, IrcMessageType type);
     public signal void noticed(IrcUser user, string target, string message, IrcMessageType type);
     public signal void parted_channel(IrcUser user, string channel, string? reason);
+
+    public signal void connecting(IrcConnectionStatus status, string host, int port, string message);
 
     /* All this is to ensure we perform valid non-blocking queued output. Phew. */
     private Queue<string> out_q;
@@ -196,6 +204,8 @@ public class IrcCore : Object
     {
         try {
             var r = Resolver.get_default();
+            connecting(IrcConnectionStatus.RESOLVING, host, (int)port, @"Looking up $(host)...");
+
             var addresses = yield r.lookup_by_name_async(host, cancel);
             var addr = addresses.nth_data(0);
 
@@ -208,6 +218,8 @@ public class IrcCore : Object
                 client.event.connect(on_client_event);
             }
 
+            var resolv = addr.to_string();
+            connecting(IrcConnectionStatus.CONNECTING, resolv, (int)port, @"Connecting to $(host)... ($(resolv):$(port))");
             var connection = yield client.connect_async(sock_addr, cancel);
             if (connection != null) {
                 this.conn = connection;
@@ -219,6 +231,8 @@ public class IrcCore : Object
             ioc = new IOChannel.unix_new(connection.socket.fd);
 
             /* Attempt identification immediately, get the ball rolling */
+            connecting(IrcConnectionStatus.REGISTERING, addr.to_string(), (int)port, "Logging in...");
+
             write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
             write_socket("NICK %s\r\n", ident.nick);
 

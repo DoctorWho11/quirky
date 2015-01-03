@@ -46,6 +46,12 @@ public class DummyClient : Gtk.ApplicationWindow
         core.set_data("autojoin", autojoin);
         /* Now switch view.. */
         sidebar.select_row(header);
+
+        core.connecting.connect((s,h,p,m)=> {
+            var buf = get_named_buffer(core, "\\ROOT\\");
+            main_view.add_message(buf, "", m, IrcTextType.SERVER);
+        });
+
         core.connect.begin(host, port, ssl);
         core.messaged.connect(on_messaged);
         core.established.connect(()=> {
@@ -86,7 +92,7 @@ public class DummyClient : Gtk.ApplicationWindow
             }
             var buf = get_named_buffer(core, c);
             main_view.add_message(buf, u.nick == core.ident.nick ? "" : u.nick, msg, IrcTextType.PART);
-        }); 
+        });
         core.motd.connect((m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
             main_view.add_message(buf, "", m, IrcTextType.MOTD);
