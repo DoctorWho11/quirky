@@ -341,6 +341,7 @@ public class IrcSidebar : Gtk.Box
     public void select_row(SidebarExpandable? row)
     {
         on_row_click(row);
+        row.activated();
     }
 
     private void on_row_click(SidebarExpandable? source)
