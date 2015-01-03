@@ -14,7 +14,6 @@ public class DummyClient : Gtk.ApplicationWindow
     Gtk.Entry input;
     IrcTextWidget? main_view;
     Gtk.ScrolledWindow scroll;
-    IrcIdentity ident;
     IrcCore? core = null;
     IrcSidebar sidebar;
     string? target;
@@ -30,7 +29,7 @@ public class DummyClient : Gtk.ApplicationWindow
         (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected);
     }
 
-    private void connect_server(string host, uint16 port, bool ssl, string? autojoin)
+    private void connect_server(string host, uint16 port, bool ssl, string? autojoin, IrcIdentity ident)
     {
         var header = sidebar.add_expandable(host, "network-server-symbolic");
         header.activated.connect(()=> {
@@ -39,7 +38,7 @@ public class DummyClient : Gtk.ApplicationWindow
             update_actions();
             var buf = get_named_buffer(core, "\\ROOT\\");
             main_view.set_buffer(buf);
-            main_view.update_tabs(buf, ident.nick);
+            main_view.update_tabs(buf, core.ident.nick);
         });
         /* Need moar status in window.. */
         message("Connecting to %s:%d", host, port);
@@ -63,7 +62,7 @@ public class DummyClient : Gtk.ApplicationWindow
         core.ctcp.connect(on_ctcp);
         core.joined_channel.connect((u,c)=> {
             update_actions();
-            if (u.nick == ident.nick) {
+            if (u.nick == core.ident.nick) {
                 var root = roots[core];
                 var item = root.add_item(c, "user-available-symbolic");
                 item.set_data("icore", core);
@@ -73,7 +72,7 @@ public class DummyClient : Gtk.ApplicationWindow
                     this.core = item.get_data("icore");
                     this.target = item.get_data("ichannel");
                     main_view.set_buffer(buf);
-                    main_view.update_tabs(buf, ident.nick);
+                    main_view.update_tabs(buf, core.ident.nick);
                     update_actions();
                 });
                 var buf = get_named_buffer(core, c); /* do nothing :P */
@@ -89,7 +88,7 @@ public class DummyClient : Gtk.ApplicationWindow
                 msg += @" ($(r))";
             }
             var buf = get_named_buffer(core, c);
-            main_view.add_message(buf, u.nick == ident.nick ? "" : u.nick, msg, IrcTextType.PART);
+            main_view.add_message(buf, u.nick == core.ident.nick ? "" : u.nick, msg, IrcTextType.PART);
         }); 
         core.motd.connect((m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
@@ -110,7 +109,7 @@ public class DummyClient : Gtk.ApplicationWindow
 
         if (!set_view) {
             main_view.set_buffer(buf);
-            main_view.update_tabs(buf, ident.nick);
+            main_view.update_tabs(buf, core.ident.nick);
             set_view = true;
         }
 
@@ -160,7 +159,14 @@ public class DummyClient : Gtk.ApplicationWindow
             Idle.add(()=> {
                 var dlg = new ConnectDialog(this);
                 if (dlg.run() == Gtk.ResponseType.OK) {
-                    connect_server(dlg.host, dlg.port, dlg.ssl, dlg.channel);
+                    IrcIdentity ident = IrcIdentity() {
+                        nick = "ikeytestclient", /* Backup */
+                        username = "dummyclient",
+                        gecos = "Ikeys Test Client",
+                        mode = 0
+                    };
+                    ident.nick = dlg.nickname;
+                    connect_server(dlg.host, dlg.port, dlg.ssl, dlg.channel, ident);
                 }
                 dlg.destroy();
                 return false;
@@ -199,14 +205,6 @@ public class DummyClient : Gtk.ApplicationWindow
         input = new Gtk.Entry();
         input.activate.connect(send_text);
         layout.pack_end(input, false, false, 0);
-
-        /* Totes evil. Make configurable */
-        ident = IrcIdentity() {
-            nick = "ikeytestclient",
-            username = "ikeytest",
-            gecos = "Ikeys Test Client",
-            mode = 0
-        };
 
         /* Need to fix this! Make it an option, and soon! */
         //connect_server("localhost", 6667, false);
@@ -267,9 +265,9 @@ public class DummyClient : Gtk.ApplicationWindow
             } else {
                 core.send_message(target, msg);
             }
-            main_view.add_message(buffer, ident.nick, msg, action ? IrcTextType.ACTION : IrcTextType.MESSAGE);
+            main_view.add_message(buffer, core.ident.nick, msg, action ? IrcTextType.ACTION : IrcTextType.MESSAGE);
         }
-        main_view.update_tabs(buffer, ident.nick);
+        main_view.update_tabs(buffer, core.ident.nick);
     }
 
     protected void on_messaged(IrcCore core, IrcUser user, string target, string message, IrcMessageType type)

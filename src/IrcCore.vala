@@ -68,7 +68,7 @@ public class IrcCore : Object
 {
     SocketClient? client;
     SocketConnection? conn;
-    IrcIdentity ident;
+    public IrcIdentity ident;
     Cancellable cancel;
 
     public static int64 sid = 0;
