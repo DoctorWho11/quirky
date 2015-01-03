@@ -93,7 +93,15 @@ public class DummyClient : Gtk.ApplicationWindow
             var buf = get_named_buffer(core, c);
             main_view.add_message(buf, u.nick == core.ident.nick ? "" : u.nick, msg, IrcTextType.PART);
         });
-        core.motd.connect((m)=> {
+        core.motd_start.connect((m)=> {
+            var buf = get_named_buffer(core, "\\ROOT\\");
+            main_view.add_message(buf, "", m, IrcTextType.MOTD);
+        });
+        core.motd_line.connect((m)=> {
+            var buf = get_named_buffer(core, "\\ROOT\\");
+            main_view.add_message(buf, "", m, IrcTextType.MOTD);
+        });
+        core.motd.connect((o,m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
             main_view.add_message(buf, "", m, IrcTextType.MOTD);
         });
@@ -109,7 +117,9 @@ public class DummyClient : Gtk.ApplicationWindow
             buf = new Gtk.TextBuffer(main_view.tags);
             buffers[compname] = buf;
         }
-
+        if (name == "\\ROOT\\") {
+            buffers[compname].set_data("ignoretab", true);
+        }
         return buffers[compname];
     }
 

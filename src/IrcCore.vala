@@ -110,7 +110,7 @@ public class IrcCore : Object
     /**
      * Emitted when we start recieving the MOTD
      */
-    public signal void motd_start();
+    public signal void motd_start(string msg);
 
     /**
      * Emitted for each line of the MOTD
@@ -120,7 +120,7 @@ public class IrcCore : Object
     /**
      * Emitted when we get RPL_ENDOFMOTD, with the complete MOTD
      */
-    public signal void motd(string motd);
+    public signal void motd(string motd, string end);
 
     /* Emitted when we get the names list (complete) */
     public signal void names_list(string channel, List<string> users);
@@ -448,7 +448,9 @@ public class IrcCore : Object
             /* Motd handling */
             case IRC.RPL_MOTDSTART:
                 _motd = ""; /* Reset motd */
-                motd_start();
+                string msg;
+                parse_simple(sender, remnant, null, null, out msg);
+                motd_start(msg);
                 break;
             case IRC.RPL_MOTD:
                 string msg;
@@ -457,10 +459,12 @@ public class IrcCore : Object
                 _motd += "\n" + msg;
                 break;
             case IRC.RPL_ENDOFMOTD:
+                string msg;
+                parse_simple(sender, remnant, null, null, out msg);
                 if (!_motd.has_suffix("\n")) {
                     _motd += "\n";
                 }
-                motd(_motd);
+                motd(_motd, msg);
                 break;
             default:
                 break;

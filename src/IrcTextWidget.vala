@@ -179,8 +179,10 @@ public class IrcTextWidget : Gtk.TextView
         buf.get_end_iter(out i);
 
         if (last_nick != whom) {
-            buf.insert_with_tags_by_name(i, " ", -1, "spacing", "default");
-            buf.get_end_iter(out i);
+            if (ttype != IrcTextType.MOTD && ttype != IrcTextType.SERVER) {
+                buf.insert_with_tags_by_name(i, " ", -1, "spacing", "default");
+                buf.get_end_iter(out i);
+            }
         }
 
         /* Custom formatting for certain message types.. */
@@ -199,7 +201,7 @@ public class IrcTextWidget : Gtk.TextView
                 buf.insert_with_tags_by_name(i, @"$(whom) ", -1, "nickname", "m_" + mcols[nick_index], "default");
             }
         } else {
-            if (ttype != IrcTextType.SERVER) {
+            if (ttype != IrcTextType.SERVER && ttype != IrcTextType.MOTD) {
                 /* Default, right align everything.. */
                 buf.insert_with_tags_by_name(i, "\t", -1, "default");
             }
@@ -364,6 +366,11 @@ public class IrcTextWidget : Gtk.TextView
         if (buffer != this.buffer) {
             return;
         }
+        bool ignore = buffer.get_data("ignoretab");
+        if (ignore) {
+            return;
+        }
+
         int lwidth = buffer.get_data("_nlwidth");
         if (nick == "") {
             nick = buffer.get_data("_lastnick");
