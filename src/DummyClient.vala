@@ -36,6 +36,8 @@ public class DummyClient : Gtk.ApplicationWindow
             this.core = core;
             update_actions();
             var buf = get_named_buffer(core, "\\ROOT\\");
+            /* Just ensures we don't use nicknames for sizing of our margin/indent */
+            buf.set_data("longestnick", " ");
             set_buffer(buf);
             update_nick(core);
         });
@@ -187,12 +189,15 @@ public class DummyClient : Gtk.ApplicationWindow
         btn.add(img);
         menu = new Menu();
         menu.append("Show timestamps", "app.timestamps");
+        menu.append("Show margin", "app.margin");
         btn.set_menu_model(menu);
         btn.set_use_popover(true);
         header.pack_end(btn);
 
         /* toggle timestamps */
         var paction = new PropertyAction("timestamps", main_view, "use_timestamp");
+        application.add_action(paction);
+        paction = new PropertyAction("margin", main_view, "visible_margin");
         application.add_action(paction);
 
         update_actions();
@@ -400,7 +405,8 @@ public class DummyClient : Gtk.ApplicationWindow
     private void set_buffer(Gtk.TextBuffer buffer)
     {
         main_view.set_buffer(buffer);
-        main_view.update_tabs(buffer, core.ident.nick);
+        string longest_nick = buffer.get_data("longestnick");
+        main_view.update_tabs(buffer, longest_nick != null ? longest_nick : core.ident.nick);
         main_view.scroll_to_bottom(buffer);
     }
 

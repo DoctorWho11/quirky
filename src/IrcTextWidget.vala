@@ -91,12 +91,30 @@ public class IrcTextWidget : Gtk.TextView
     public bool use_timestamp {
         public set {
             tags.lookup("timestamp").invisible = !value;
-            update_tabs(get_buffer(), null, true);
+            string? lnick = null;
+            if (get_buffer() != null) {
+                lnick = get_buffer().get_data("longestnick");
+            }
+            update_tabs(get_buffer(), lnick, true);
         }
         public get {
             return !(tags.lookup("timestamp").invisible);
         }
     }
+
+    private bool _visible_margin;
+    public bool visible_margin {
+        public set {
+            _visible_margin = value;
+            queue_draw();
+        }
+        public get {
+            return _visible_margin;
+        }
+    }
+
+    private int margin_offset = -1;
+
     private int timestamp_length = 0;
 
     private int max(int a, int b)
@@ -105,6 +123,22 @@ public class IrcTextWidget : Gtk.TextView
             return a;
         }
         return b;
+    }
+
+    public override bool draw(Cairo.Context cr)
+    {
+        Gtk.Allocation alloc;
+        get_allocation(out alloc);
+        base.draw(cr);
+
+        if (_visible_margin && margin_offset > 0 && get_buffer() != null) {
+            cr.rectangle(margin_offset, 0, 1, alloc.height);
+            /* TODO: Make customisable */
+            cr.set_source_rgba(0.6, 0.6, 0.6, 0.5);
+            cr.fill();
+        }
+
+        return Gdk.EVENT_PROPAGATE;
     }
 
     public override void get_preferred_width(out int n, out int w)
@@ -120,6 +154,8 @@ public class IrcTextWidget : Gtk.TextView
         set_wrap_mode(Gtk.WrapMode.WORD_CHAR);
         set_cursor_visible(false);
         set_editable(false);
+
+        visible_margin = false;
 
         tags = new Gtk.TextTagTable();
         var tag = new Gtk.TextTag("default");
@@ -267,10 +303,10 @@ public class IrcTextWidget : Gtk.TextView
                 buf.insert_with_tags_by_name(i, @"$(whom) ", -1, "nickname", "m_" + mcols[nick_index], "default");
             }
         } else {
-            if (ttype != IrcTextType.SERVER && ttype != IrcTextType.MOTD) {
+            //if (ttype != IrcTextType.SERVER && ttype != IrcTextType.MOTD) {
                 /* Default, right align everything.. */
                 buf.insert_with_tags_by_name(i, "\t", -1, "default");
-            }
+            //}
         }
     
         buf.get_end_iter(out i);
@@ -432,27 +468,22 @@ public class IrcTextWidget : Gtk.TextView
         if (buffer != this.buffer) {
             return;
         }
-        bool ignore = buffer.get_data("ignoretab");
-        if (ignore) {
+
+        if (nick == null) {
+            nick = " ";
+        }
+        string longest = buffer.get_data("longestnick");
+        if (longest == null) {
+            longest = nick;
+        }
+
+        if (longest.length > nick.length) {
             return;
+        } else {
+            buffer.set_data("longestnick", nick);
         }
 
-        int lwidth = buffer.get_data("_nlwidth");
-        if (nick == "" || nick == null) {
-            nick = buffer.get_data("_lastnick");
-            if (nick == null) {
-                /* Set up some default spacing.. be sane */
-                nick = "    ";
-            }
-        }
-
-        if (lwidth >= nick.length && !invalidate) {
-            return;
-        }
-        /* sane default.. ? */
-
-        var twidth = nick.length + 5;
-        buffer.set_data("_nlwidth", twidth);
+        var twidth = nick.length + 2;
 
         if (use_timestamp) {
             twidth += timestamp_length + 1;
@@ -468,5 +499,11 @@ public class IrcTextWidget : Gtk.TextView
         tabs.set_tab(0, Pango.TabAlign.LEFT, twidth * (int)pxwidth);
         set_tabs(tabs);
         indent = -twidth * pxwidth; // indent wrapped lines
+        margin_offset = (twidth * (int)pxwidth) - (pxwidth/2);
+        if (use_timestamp) {
+            margin_offset -= (pxwidth/2);
+        }
+
+        queue_draw();
     }
 }
