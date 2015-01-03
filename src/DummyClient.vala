@@ -11,7 +11,7 @@
 public class DummyClient : Gtk.ApplicationWindow
 {
     Gtk.HeaderBar header;
-    Gtk.Entry input;
+    IrcTextEntry input;
     IrcTextWidget? main_view;
     Gtk.ScrolledWindow scroll;
     IrcCore? core = null;
@@ -234,21 +234,23 @@ public class DummyClient : Gtk.ApplicationWindow
         var entry = new Gtk.Entry();
         var pop = new Gtk.Popover(nick_button);
         entry.activate.connect(()=> {
+            var txt = entry.text.strip();
             pop.hide();
-            if (entry.text.strip().length == 0) {
+            if (txt.length == 0) {
                 return;
             }
             if (core == null) {
                 warning("Cannot set nick without IRCCORE!");
                 return;
             }
-            core.set_nick(entry.text);
+            core.set_nick(txt);
         });
 
         pop.closed.connect(()=> {
             nick_button.freeze_notify();
             nick_button.set_active(false);
             nick_button.thaw_notify();
+            entry.set_text("");
         });
         pop.border_width = 10;
         pop.add(entry);
@@ -257,7 +259,7 @@ public class DummyClient : Gtk.ApplicationWindow
             pop.show_all();
         });
         nick_button.set_sensitive(false);
-        input = new Gtk.Entry();
+        input = new IrcTextEntry();
         input.activate.connect(send_text);
         bottom.pack_end(input, true, true, 0);
 

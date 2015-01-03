@@ -34,6 +34,52 @@ public enum IrcTextType {
 }
 
 /**
+ * Custom Entry enabling input of special control chars..
+ */
+public class IrcTextEntry : Gtk.Entry
+{
+    public override bool key_press_event(Gdk.EventKey event)
+    {
+        unichar to_append = ' ';
+        bool replace = true;
+
+        if (event.state == Gdk.ModifierType.CONTROL_MASK) {
+            switch (event.keyval) {
+                case Gdk.Key.K:
+                case Gdk.Key.k:
+                    to_append = MCS.COLOR;
+                    break;
+                case Gdk.Key.B:
+                case Gdk.Key.b:
+                    to_append = MCS.BOLD;
+                    break;
+                case Gdk.Key.I:
+                case Gdk.Key.i:
+                    to_append = MCS.ITALIC;
+                    break;
+                case Gdk.Key.U:
+                case Gdk.Key.u:
+                    to_append = MCS.UNDERLINE;
+                    break;
+                case Gdk.Key.O:
+                case Gdk.Key.o:
+                    to_append = MCS.RESET;
+                    break;
+                default:
+                    replace = false;
+                    break;
+            }
+        } else {
+            replace = false;
+        }
+        if (replace) {
+            this.insert_at_cursor(to_append.to_string());
+            return Gdk.EVENT_STOP;
+        }
+        return base.key_press_event(event);
+    }
+}
+/**
  * Fancier TextView suitable for usage in our main IRC client
  */
 public class IrcTextWidget : Gtk.TextView
