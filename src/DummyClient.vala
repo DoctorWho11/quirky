@@ -17,6 +17,7 @@ public class DummyClient : Gtk.ApplicationWindow
     IrcCore? core = null;
     IrcSidebar sidebar;
     string? target;
+    Gtk.Button nick_button;
 
     HashTable<string,Gtk.TextBuffer> buffers;
 
@@ -36,6 +37,7 @@ public class DummyClient : Gtk.ApplicationWindow
             update_actions();
             var buf = get_named_buffer(core, "\\ROOT\\");
             set_buffer(buf);
+            update_nick(core);
         });
         /* Need moar status in window.. */
         message("Connecting to %s:%d", host, port);
@@ -51,6 +53,7 @@ public class DummyClient : Gtk.ApplicationWindow
             var buf = get_named_buffer(core, "\\ROOT\\");
             main_view.add_message(buf, "", m, IrcTextType.SERVER);
         });
+        core.nick_error.connect(on_nick_error);
 
         core.connect.begin(host, port, ssl);
         core.messaged.connect(on_messaged);
@@ -75,6 +78,7 @@ public class DummyClient : Gtk.ApplicationWindow
                     this.target = item.get_data("ichannel");
                     set_buffer(buf);
                     update_actions();
+                    update_nick(core);
                 });
                 root.set_expanded(true);
                 root.select_item(item);
@@ -104,6 +108,11 @@ public class DummyClient : Gtk.ApplicationWindow
         core.motd.connect((o,m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
             main_view.add_message(buf, "", m, IrcTextType.MOTD);
+        });
+        core.nick_changed.connect((u,n,us)=> {
+            if (us) {
+                update_nick(core);
+            }
         });
     }
 
@@ -214,9 +223,15 @@ public class DummyClient : Gtk.ApplicationWindow
         scroll.add(main_view);
         layout.pack_start(scroll, true, true, 0);
 
+        var bottom = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
+        bottom.get_style_context().add_class("linked");
+        layout.pack_end(bottom, false, false, 0);
+        nick_button = new Gtk.Button.with_label("");
+        bottom.pack_start(nick_button, false, false, 0);
+
         input = new Gtk.Entry();
         input.activate.connect(send_text);
-        layout.pack_end(input, false, false, 0);
+        bottom.pack_end(input, true, true, 0);
 
         set_default_size(800, 550);
         window_position = Gtk.WindowPosition.CENTER;
@@ -224,6 +239,19 @@ public class DummyClient : Gtk.ApplicationWindow
             show_connect_dialog();
             return false;
         });
+    }
+
+    private void update_nick(IrcCore core)
+    {
+        if (this.core == core) {
+            nick_button.set_label(core.ident.nick);
+        }
+    }
+
+    private void on_nick_error(IrcCore core, string nick, IrcNickError e, string human)
+    {
+        /* Placeholder, need to add dynamic support... */
+        message("Got a NICK error! %s", human);
     }
 
     /**
@@ -333,6 +361,7 @@ public class DummyClient : Gtk.ApplicationWindow
                 var buf = get_named_buffer(core, this.target);
                 set_buffer(buf);
                 update_actions();
+                update_nick(core);
             });
         }
     }
