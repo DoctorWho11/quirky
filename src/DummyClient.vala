@@ -8,7 +8,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  */
-public class DummyClient : Gtk.Window
+public class DummyClient : Gtk.ApplicationWindow
 {
     Gtk.HeaderBar header;
     Gtk.Entry input;
@@ -100,8 +100,10 @@ public class DummyClient : Gtk.Window
         return buffers[compname];
     }
 
-    public DummyClient()
+    public DummyClient(Gtk.Application application)
     {
+        Object(application: application);
+
         header = new Gtk.HeaderBar();
         header.set_show_close_button(true);
         set_title("DummyClient");
@@ -109,8 +111,6 @@ public class DummyClient : Gtk.Window
         header.set_title("DummyClient");
 
         set_icon_name("xchat");
-
-        destroy.connect(Gtk.main_quit);
 
         var main_layout = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
         add(main_layout);
@@ -153,7 +153,6 @@ public class DummyClient : Gtk.Window
         connect_server("localhost", 6667, false);
 
         set_size_request(800, 550);
-        show_all();
     }
 
     protected void send_text()
@@ -180,11 +179,30 @@ public class DummyClient : Gtk.Window
     }
 }
 
-public static void main(string[] args)
+/**
+ * Enable GtkApplication/actions usage..
+ */
+public class DummyClientApp : Gtk.Application
 {
-    Gtk.init(ref args);
-    var c = new DummyClient();
-    Gtk.main();
+    static DummyClient win = null;
 
-    c = null;
+    public DummyClientApp()
+    {
+        Object(application_id: "com.evolve_os.DummyIrcClient", flags: ApplicationFlags.FLAGS_NONE);
+    }
+
+    public override void activate()
+    {
+        if (win == null) {
+            win = new DummyClient(this);
+        }
+        win.show_all();
+        win.present();
+    }
+}
+
+public static int main(string[] args)
+{
+    var app = new DummyClientApp();
+    return app.run();
 }
