@@ -56,6 +56,7 @@ public class DummyClient : Gtk.ApplicationWindow
             }
             update_actions();
         });
+        core.ctcp.connect(on_ctcp);
         core.joined_channel.connect((u,c)=> {
             update_actions();
             if (u.nick == ident.nick) {
@@ -189,6 +190,28 @@ public class DummyClient : Gtk.ApplicationWindow
         connect_server("localhost", 6667, false);
 
         set_size_request(800, 550);
+    }
+
+    /**
+     * NOTE: We must log these and make the responses optional/customisable!
+     */
+    private void on_ctcp(IrcCore core, IrcUser user, string command, string text, bool privmsg)
+    {
+        switch (command) {
+            case "VERSION":
+                core.send_ctcp(user.nick, "VERSION", "DummyClient 0.1 / Probably Linux!", privmsg);
+                break;
+            case "PING":
+                if (text == "") {
+                    warning("%s sent us a borked CTCP PING with no timestamp", user.nick);
+                } else {
+                    core.send_ctcp(user.nick, "PING", text, privmsg);
+                }
+                break;
+            default:
+                warning("Unknown CTCP request (%s %s) from %s: ", command, text, user.nick);
+                break;
+            }
     }
 
     protected void send_text()
