@@ -180,11 +180,12 @@ public class DummyClient : Gtk.ApplicationWindow
         buffers = new HashTable<string,Gtk.TextBuffer>(str_hash, str_equal);
         roots = new HashTable<IrcCore?,SidebarExpandable>(direct_hash, direct_equal);
 
-        var layout = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
+        var layout = new Gtk.Box(Gtk.Orientation.VERTICAL, 3);
         main_layout.pack_start(layout, true, true, 0);
+        layout.margin = 3;
+        sidebar.margin_top = 3;
 
         scroll = new Gtk.ScrolledWindow(null, null);
-        scroll.border_width = 2;
         scroll.set_shadow_type(Gtk.ShadowType.IN);
         main_view = new IrcTextWidget();
         main_view.set_editable(false);
