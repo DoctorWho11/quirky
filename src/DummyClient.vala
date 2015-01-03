@@ -17,7 +17,7 @@ public class DummyClient : Gtk.ApplicationWindow
     IrcCore? core = null;
     IrcSidebar sidebar;
     string? target;
-    Gtk.Button nick_button;
+    Gtk.ToggleButton nick_button;
 
     HashTable<string,Gtk.TextBuffer> buffers;
 
@@ -63,6 +63,7 @@ public class DummyClient : Gtk.ApplicationWindow
                 core.join_channel(aj);
             }
             update_actions();
+            update_nick(core);
         });
         core.ctcp.connect(on_ctcp);
         core.joined_channel.connect((u,c)=> {
@@ -226,9 +227,36 @@ public class DummyClient : Gtk.ApplicationWindow
         var bottom = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
         bottom.get_style_context().add_class("linked");
         layout.pack_end(bottom, false, false, 0);
-        nick_button = new Gtk.Button.with_label("");
+        nick_button = new Gtk.ToggleButton.with_label("");
         bottom.pack_start(nick_button, false, false, 0);
 
+        /* Shmancy. Popover to change nickname =) */
+        var entry = new Gtk.Entry();
+        var pop = new Gtk.Popover(nick_button);
+        entry.activate.connect(()=> {
+            pop.hide();
+            if (entry.text.strip().length == 0) {
+                return;
+            }
+            if (core == null) {
+                warning("Cannot set nick without IRCCORE!");
+                return;
+            }
+            core.set_nick(entry.text);
+        });
+
+        pop.closed.connect(()=> {
+            nick_button.freeze_notify();
+            nick_button.set_active(false);
+            nick_button.thaw_notify();
+        });
+        pop.border_width = 10;
+        pop.add(entry);
+
+        nick_button.clicked.connect(()=> {
+            pop.show_all();
+        });
+        nick_button.set_sensitive(false);
         input = new Gtk.Entry();
         input.activate.connect(send_text);
         bottom.pack_end(input, true, true, 0);
@@ -244,6 +272,7 @@ public class DummyClient : Gtk.ApplicationWindow
     private void update_nick(IrcCore core)
     {
         if (this.core == core) {
+            nick_button.set_sensitive(core.connected);
             nick_button.set_label(core.ident.nick);
         }
     }
