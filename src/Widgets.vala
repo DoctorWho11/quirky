@@ -172,14 +172,21 @@ public class SidebarExpandable : Gtk.Box
 
     private weak SidebarItem? selected_item;
 
+    public void select_item(SidebarItem? item)
+    {
+        if (selected_item != null) {
+            selected_item.selected = false;
+        }
+        selected_item = item;
+        selected_item.selected = true;
+        queue_draw();
+        clicked();
+        selected = true;
+    }
+
     public bool handle_mouse(Gtk.Widget? source_widget, Gdk.EventButton button) {
         if (source_widget.get_type() == typeof(SidebarItem)) {
-            if (selected_item != null) {
-                selected_item.selected = false;
-            }
-            selected_item = source_widget as SidebarItem;
-            selected_item.selected = true;
-            queue_draw();
+           select_item((SidebarItem)source_widget);
         } else {
             if (selected_item != null) {
                 selected_item.selected = false;
@@ -187,9 +194,9 @@ public class SidebarExpandable : Gtk.Box
                 queue_draw();
             }
             activated();
+            clicked();
+            selected = true;
         }
-        clicked();
-        selected = true;
         return Gdk.EVENT_PROPAGATE;
     }
 

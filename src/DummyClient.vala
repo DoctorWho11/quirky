@@ -78,6 +78,7 @@ public class DummyClient : Gtk.ApplicationWindow
                     update_actions();
                 });
                 root.set_expanded(true);
+                root.select_item(item);
                 var buf = get_named_buffer(core, c); /* do nothing :P */
                 main_view.add_message(buf, "", @"You have joined $(c)", IrcTextType.JOIN);
             } else {
