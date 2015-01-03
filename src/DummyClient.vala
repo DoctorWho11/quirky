@@ -389,7 +389,10 @@ public class ConnectDialog : Gtk.Dialog
         var entry = new Gtk.Entry();
         host_ent = entry;
         entry.changed.connect(()=> {
-            do_validate();
+            do_validate(false);
+        });
+        entry.activate.connect(()=> {
+            do_validate(true);
         });
         entry.hexpand = true;
         grid.attach(entry, column+1, row, max_size-1, norm_size);
@@ -426,7 +429,10 @@ public class ConnectDialog : Gtk.Dialog
 
         /* Nick validation.. */
         entry.changed.connect(()=> {
-            do_validate();
+            do_validate(false);
+        });
+        entry.activate.connect(()=> {
+            do_validate(true);
         });
 
         row++;
@@ -439,6 +445,9 @@ public class ConnectDialog : Gtk.Dialog
         entry.changed.connect(()=> {
             channel = entry.text;
         });
+        entry.activate.connect(()=> {
+            do_validate(true);
+        });
         grid.attach(entry, column+1, row, max_size-1, norm_size);
 
         grid.margin_bottom = 6;
@@ -448,7 +457,7 @@ public class ConnectDialog : Gtk.Dialog
         get_content_area().show_all();
     }
 
-    private void do_validate()
+    private void do_validate(bool emit)
     {
         unichar[] spcls = {
             '[', ']', '\\', '\'', '_', '^', '{', '|', '}'
@@ -502,6 +511,10 @@ public class ConnectDialog : Gtk.Dialog
         host = host_ent.text;
         nickname = nick_ent.text;
         con.set_sensitive(true);
+
+        if (emit) {
+            response(Gtk.ResponseType.OK);
+        }
     }
 }
 
