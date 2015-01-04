@@ -8,6 +8,28 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  */
+
+/**
+ * Command callbacks..
+ */
+delegate void cmd_callback(string? line);
+
+/**
+ * Assists in command parsing
+ * @note If min_params is 0, max_params MUST NOT be 0
+ */
+struct Command {
+    weak cmd_callback cb; /**< Callback for this command */
+    int min_params; /**< Minimum parameters */
+    int max_params; /**< Maximum parameters */
+    string? help; /**<Optional help string, highly recommended to set. */
+    bool offline; /**<If this command can be used while not connected */
+    bool server; /**<If you can run this in the server tab */
+}
+
+/**
+ * Main client GUI
+ */
 public class DummyClient : Gtk.ApplicationWindow
 {
     Gtk.HeaderBar header;
@@ -24,6 +46,9 @@ public class DummyClient : Gtk.ApplicationWindow
     HashTable<string,Gtk.ListStore> nicklists;
 
     HashTable<IrcCore?,SidebarExpandable> roots;
+
+    /** Command callbacks */
+    HashTable<string,Command?> commands;
 
     Gtk.Revealer nick_reveal;
     Gtk.Revealer side_reveal;
@@ -76,6 +101,7 @@ window.
         var header = sidebar.add_expandable(host, "network-server-symbolic");
         header.activated.connect(()=> {
             IrcCore core = header.get_data("icore");
+            this.target = null;
             this.core = core;
             update_actions();
             var buf = get_named_buffer(core, "\\ROOT\\");
@@ -258,6 +284,25 @@ window.
         header.set_title("DummyClient");
 
         main_view = new IrcTextWidget();
+
+        commands = new HashTable<string,Command?>(str_hash, str_equal);
+        /* Handle /me action */
+        commands["me"] = Command() {
+            cb = (line)=> {
+                core.send_action(this.target, line);
+                main_view.add_message(main_view.buffer, core.ident.nick, line,  IrcTextType.ACTION);
+            },
+            help = "%C <action>, sends an \"action\" to the current channel or person",
+            min_params = 1
+        };
+        commands["join"] = Command() {
+            cb = (line)=> {
+                core.join_channel(line);
+            },
+            help = "%C <channel> [password], join the given channel with an optional password",
+            min_params = 1,
+            server = true
+        };
 
         /* actions.. */
         var btn = new Gtk.MenuButton();
@@ -555,27 +600,23 @@ window.
         if (input.text.length < 1) {
             return;
         }
-        bool action = false;
         string message = input.text;
-        if (core == null) {
-            warning("MISSING IRCCORE!");
+
+        if (message.has_prefix("/") && message.length >= 2) {
+            parse_command(message);
+            input.set_text("");
             return;
         }
 
-        /* TODO: Add command parser!! */
-        if (message.has_prefix("/me")) {
-            var splits = message.split("/me");
-            if (splits.length < 2) {
-                warning("OHAI our command handling sucks right now, but not as bad as your /me");
-                return;
-            }
-            message = input.text.split("/me")[1].chug();
-            if (message.length == 0) {
-                warning("OHAI our command handling sucks right now, but not as bad as your /me");
-                return;
-            }
-
-            action = true;
+        if (core == null) {
+            main_view.add_error(main_view.buffer, "You are not currently connected");
+            input.set_text("");
+            return;
+        }
+        if (target == null) {
+            main_view.add_error(main_view.buffer, "Please try to /JOIN a channel first");
+            input.set_text("");
+            return;
         }
         if (message.length == 0) {
             return;
@@ -586,12 +627,8 @@ window.
 
         /* We really need to think about output throttling. */
         foreach (var msg in message.split("\n")) {
-            if (action) {
-                core.send_action(target, msg);
-            } else {
-                core.send_message(target, msg);
-            }
-            main_view.add_message(buffer, core.ident.nick, msg, action ? IrcTextType.ACTION : IrcTextType.MESSAGE);
+            core.send_message(target, msg);
+            main_view.add_message(buffer, core.ident.nick, msg, IrcTextType.MESSAGE);
         }
         main_view.update_tabs(buffer, core.ident.nick);
     }
@@ -646,6 +683,65 @@ window.
         } else {
             main_view.add_message(buffer, user.nick, message, IrcTextType.MESSAGE);
         }
+    }
+
+    /**
+     * Later on this will be expanded, right now it just replaces
+     * %C with the command name.
+     */
+    string template(string input, string cmd)
+    {
+        var t = input.replace("%C", cmd);
+        return t;
+    }
+
+    /**
+     * Handle a command
+     */
+    void parse_command(string? iline)
+    {
+        var line = iline.substring(1);
+
+        var p = line.split(" ");
+        var cmd = p[0].down();
+        if (!(cmd in commands)) {
+            main_view.add_error(main_view.buffer, "Unknown command: %s", cmd);
+            return;
+        }
+        weak Command? command = commands.lookup(cmd);
+        if (this.core == null && !command.offline) {
+            main_view.add_error(main_view.buffer, "/%s can only be used while connected", cmd);
+            return;
+        }
+        if (this.target == null && !command.server) {
+            main_view.add_error(main_view.buffer, "/%s cannot be used in the server view", cmd);
+            return;
+        }
+        var r = p[1:p.length];
+        if (r.length < command.min_params) {
+            if (command.help != null) {
+                var parsed = template(command.help, cmd.up());
+                main_view.add_error(main_view.buffer, "Usage: %s", parsed);
+            } else {
+                main_view.add_error(main_view.buffer, "Invalid use of /%s", cmd);
+            }
+            return;
+        }
+        if (r.length > command.max_params && command.max_params > command.min_params) {
+            if (command.help != null) {
+                var parsed = template(command.help, cmd.up());
+                main_view.add_error(main_view.buffer, "Usage: %s", parsed);
+            } else {
+                main_view.add_error(main_view.buffer, "Invalid use of /%s", cmd);
+            }
+        }
+        string? remnant;
+        if (r.length >= 1) {
+            remnant = string.joinv(" ", p[1:p.length]);
+        } else {
+            remnant = null;
+        }
+        command.cb(remnant);
     }
 }
 

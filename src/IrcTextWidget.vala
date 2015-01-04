@@ -30,7 +30,9 @@ public enum IrcTextType {
     JOIN,
     PART,
     MOTD,
-    SERVER
+    SERVER,
+    ERROR,
+    INFO
 }
 
 /**
@@ -350,7 +352,7 @@ public class IrcTextWidget : Gtk.TextView
         buf.get_end_iter(out i);
 
         if (last_nick != whom) {
-            if (ttype != IrcTextType.MOTD && ttype != IrcTextType.SERVER) {
+            if (ttype != IrcTextType.MOTD && ttype != IrcTextType.SERVER && ttype != IrcTextType.ERROR && ttype != IrcTextType.INFO) {
                 buf.insert_with_tags_by_name(i, " ", -1, "spacing", "default");
                 buf.get_end_iter(out i);
             }
@@ -374,7 +376,7 @@ public class IrcTextWidget : Gtk.TextView
             }
         } else if (ttype == IrcTextType.ACTION) {
             buf.insert_with_tags_by_name(i, @"\t* $(whom) ", -1, "nickname", "m_" + mcols[nick_index], "action", "default");
-        } else if (ttype == IrcTextType.JOIN || ttype == IrcTextType.PART) {
+        } else if (ttype == IrcTextType.JOIN || ttype == IrcTextType.PART || ttype == IrcTextType.ERROR || ttype == IrcTextType.INFO) {
             buf.insert_with_tags_by_name(i, @"\t* ", -1, "default");
             if (whom != "") {
                 buf.get_end_iter(out i);
@@ -535,6 +537,20 @@ public class IrcTextWidget : Gtk.TextView
         update_tabs(buf, whom);
 
         scroll_to_bottom(buffer);
+    }
+
+    public void add_error(Gtk.TextBuffer buf, string fmt, ...)
+    {
+        va_list va = va_list();
+        string line = fmt.vprintf(va);
+        add_message(buf, "", line, IrcTextType.ERROR);
+    }
+
+    public void add_info(Gtk.TextBuffer buf, string fmt, ...)
+    {
+        va_list va = va_list();
+        string line = fmt.vprintf(va);
+        add_message(buf, "", line, IrcTextType.INFO);
     }
 
     public void scroll_to_bottom(Gtk.TextBuffer? buffer)
