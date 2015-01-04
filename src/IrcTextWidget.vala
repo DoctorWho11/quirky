@@ -29,6 +29,7 @@ public enum IrcTextType {
     ACTION,
     JOIN,
     PART,
+    NICK_CHANGE,
     MOTD,
     SERVER,
     ERROR,
@@ -241,6 +242,8 @@ public class IrcTextWidget : Gtk.TextView
 
         tag = new Gtk.TextTag("nickname");
         tags.add(tag);
+        tag = new Gtk.TextTag("nickchange");
+        tags.add(tag);
 
         tag = new Gtk.TextTag("action");
         tags.add(tag);
@@ -317,6 +320,57 @@ public class IrcTextWidget : Gtk.TextView
         return false;
     }
 
+    void insert_timestamp(Gtk.TextBuffer buf)
+    {
+        Gtk.TextIter i;
+        buf.get_end_iter(out i);
+        var time = new DateTime.now_local();
+        var stamp = time.format("[%H:%M:%S] ");
+        if (stamp.length > timestamp_length) {
+            timestamp_length = stamp.length;
+        }
+
+        buf.insert_with_tags_by_name(i, stamp, -1, "timestamp", "default");
+    }
+
+    string get_nick_color(string whom)
+    {
+        /* Don't ever use white/black */
+        int nick_index = (int) (whom.hash() % mcols.size());
+        if (nick_index < 2) {
+            nick_index = 2;
+        }
+
+        return "m_" + mcols[nick_index];
+    }
+
+    /**
+     * Add a nick change to this log.
+     */
+    public void add_nickchange(Gtk.TextBuffer buf, string oldnick, string newnick, string msg, bool us = false)
+    {
+        Gtk.TextIter i;
+        insert_timestamp(buf);
+
+        buf.get_end_iter(out i);
+
+        //" someone"
+        if (us) {
+            buf.insert_with_tags_by_name(i, "\t* You ", -1, "nickname", "default");
+        } else {
+            buf.insert_with_tags_by_name(i, @"\t* $(oldnick) ", -1, "nickname", get_nick_color(oldnick), "default");
+        }
+
+        buf.get_end_iter(out i);
+        //" changed their nick to"
+        buf.insert_with_tags_by_name(i, msg, -1, "default");
+        buf.get_end_iter(out i);
+        // somenewnick
+        buf.insert_with_tags_by_name(i, " " + newnick, -1, "nickname", get_nick_color(newnick), "default");
+        buf.get_end_iter(out i);
+        buf.insert_with_tags_by_name(i, "\n", -1, "default");
+    }
+
     public void add_message(Gtk.TextBuffer buf, string whom, string message, IrcTextType ttype)
     {
         /* Don't ever use white/black */
@@ -358,13 +412,8 @@ public class IrcTextWidget : Gtk.TextView
             }
         }
 
-        var time = new DateTime.now_local();
-        var stamp = time.format("[%H:%M:%S] ");
-        if (stamp.length > timestamp_length) {
-            timestamp_length = stamp.length;
-        }
+        insert_timestamp(buf);
 
-        buf.insert_with_tags_by_name(i, stamp, -1, "timestamp", "default");
         buf.get_end_iter(out i);
 
         /* Custom formatting for certain message types.. */

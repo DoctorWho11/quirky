@@ -217,7 +217,34 @@ window.
             if (us) {
                 update_nick(core);
             }
+            /* Update nicklists when we have one, instead of iterating each list. */
+            nicklists.foreach((cid,l)=> {
+                /* See if its valid for this server */
+                string? c = id_to_channel(core, cid);
+                if (c != null && nl_rename_user(core, c, u, n)) {
+                    /* Append a nick change message.. */
+                    var buf = get_named_buffer(core, c);
+                    if (buf != null) {
+                        /* Update the channel buffer.. */
+                        if (!us) {
+                            main_view.add_nickchange(buf, u.nick, n, "changed their nick to");
+                        } else {
+                            main_view.add_nickchange(buf, u.nick, n, "changed your nick to", true);
+                        }
+                    }
+                }
+            });
         });
+    }
+
+    private string? id_to_channel(IrcCore c, string id)
+    {
+        string p1 = @"$(c.id)";
+        if (!id.has_prefix(p1)) {
+            return null;
+        }
+        var ret = id.substring(p1.length);
+        return ret;
     }
 
     private unowned Gtk.TextBuffer get_named_buffer(IrcCore c, string name)
@@ -236,15 +263,17 @@ window.
         return buffers[compname];
     }
 
-    private unowned Gtk.ListStore get_nicklist(IrcCore c, string channel)
+    private unowned Gtk.ListStore? get_nicklist(IrcCore c, string channel, bool create = true)
     {
-        string compname = @"$(c.id)$(name)";
+        string compname = @"$(c.id)$(channel)";
         Gtk.ListStore? list;
         if (compname in nicklists) {
             list = nicklists[compname];
         } else {
+            if (!create) {
+                return null;
+            }
             list = new Gtk.ListStore(3, typeof(string), typeof(IrcUser), typeof(string));
-            //list.set_sort_column_id(0, Gtk.SortType.ASCENDING);
             list.set_sort_func(1, nick_compare);
             list.set_sort_column_id(1, Gtk.SortType.ASCENDING);
             nicklists[compname] = list;
@@ -492,10 +521,13 @@ window.
         }
     }
 
-    private void nl_remove_user(IrcCore core, string channel, IrcUser user)
+    private bool nl_remove_user(IrcCore core, string channel, IrcUser user)
     {
         /* Remove user from nicklist */
-        var nlist = get_nicklist(core, channel);
+        var nlist = get_nicklist(core, channel, false);
+        if (nlist == null) {
+            return false;
+        }
         Gtk.TreeIter iter;
         nlist.get_iter_first(out iter);
         while (true) {
@@ -504,12 +536,37 @@ window.
             if (u.nick == user.nick) {
                 /* Found him. */
                 nlist.remove(iter);
-                break;
+                return true;
             }
             if (!nlist.iter_next(ref iter)) {
                 break;
             }
         }
+        return false;
+    }
+
+    private bool nl_rename_user(IrcCore core, string channel, IrcUser old, string newu)
+    {
+        var nlist = get_nicklist(core, channel, false);
+        if (nlist == null) {
+            return false;
+        }
+
+        Gtk.TreeIter iter;
+        nlist.get_iter_first(out iter);
+        while (true) {
+            IrcUser? u;
+            nlist.get(iter, 1, out u, -1);
+            if (u.nick == old.nick) {
+                u.nick = newu;
+                nlist.set(iter, 1, u, 0, u.nick);
+                return true;
+            }
+            if (!nlist.iter_next(ref iter)) {
+                break;
+            }
+        }
+        return false;
     }
 
     private void nl_add_user(IrcCore core, string channel, IrcUser user)
