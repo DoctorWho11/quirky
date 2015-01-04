@@ -572,7 +572,7 @@ public class DummyClient : Gtk.ApplicationWindow
         SidebarItem? item = buffer.get_data("sitem");
         if (item == null) {
             var root = roots[core];
-            item = root.add_item(nick, "user-available-symbolic");
+            item = root.add_item(nick, "user-info-symbolic");
             buffer.set_data("sitem", item);
             item.set_data("iuser", nick);
             item.set_data("icore", core);
@@ -584,6 +584,8 @@ public class DummyClient : Gtk.ApplicationWindow
                 set_buffer(buf);
                 update_actions();
                 update_nick(core);
+                nick_reveal.set_reveal_child(false);
+                nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
             });
         }
     }
