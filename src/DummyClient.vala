@@ -27,6 +27,10 @@ public class DummyClient : Gtk.ApplicationWindow
 
     Gtk.Revealer nick_reveal;
 
+    const string VOICE_ICON = "non-starred-symbolic";
+    const string HALFOP_ICON = "semi-starred-symbolic";
+    const string OP_ICON = "starred-symbolic";
+
     const string QUIT_MESSAGE = "Enough vacation-project testing for now!";
 
     private void update_actions()
@@ -178,7 +182,7 @@ public class DummyClient : Gtk.ApplicationWindow
         if (compname in nicklists) {
             list = nicklists[compname];
         } else {
-            list = new Gtk.ListStore(2, typeof(string), typeof(IrcUser));
+            list = new Gtk.ListStore(3, typeof(string), typeof(IrcUser), typeof(string));
             //list.set_sort_column_id(0, Gtk.SortType.ASCENDING);
             list.set_sort_func(1, nick_compare);
             list.set_sort_column_id(1, Gtk.SortType.ASCENDING);
@@ -354,6 +358,9 @@ public class DummyClient : Gtk.ApplicationWindow
         render.set_padding(20, 5);
         render.alignment = Pango.Alignment.LEFT;
         nick_list.insert_column_with_attributes(-1, "Name", render, "text", 0);
+        var prender = new Gtk.CellRendererPixbuf();
+        prender.set_padding(5, 0);
+        nick_list.insert_column_with_attributes(-1, "Icon", prender, "icon_name", 2);
 
         nscroll.add(nick_list);
         nick_reveal = new Gtk.Revealer();
@@ -412,7 +419,14 @@ public class DummyClient : Gtk.ApplicationWindow
         copy.op = user.op;
         copy.hostname = user.hostname;
 
-        list.set(iter, 0, copy.nick, 1, copy);
+        string icon_name = null;
+        if (copy.op) {
+            icon_name = OP_ICON;
+        } else if (copy.voice) {
+            icon_name = VOICE_ICON;
+        }
+
+        list.set(iter, 0, copy.nick, 1, copy, 2, icon_name);
     }
 
     public bool handle_quit(Gdk.EventAny evt)
