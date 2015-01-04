@@ -23,6 +23,8 @@ public class DummyClient : Gtk.ApplicationWindow
 
     HashTable<IrcCore?,SidebarExpandable> roots;
 
+    const string QUIT_MESSAGE = "Enough vacation-project testing for now!";
+
     private void update_actions()
     {
         (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected);
@@ -277,6 +279,8 @@ public class DummyClient : Gtk.ApplicationWindow
         input.activate.connect(send_text);
         bottom.pack_end(input, true, true, 0);
 
+        delete_event.connect(handle_quit);
+
         set_default_size(800, 550);
         window_position = Gtk.WindowPosition.CENTER;
         Idle.add(()=> {
@@ -293,8 +297,40 @@ public class DummyClient : Gtk.ApplicationWindow
         }
     }
 
+    public bool handle_quit(Gdk.EventAny evt)
+    {
+        hide();
+
+        /* Disconnect from all IRC networks and clean up.. */
+        roots.foreach((k,v)=> {
+            message("Disconnecting from server..");
+            if (k.connected) {
+                k.quit(QUIT_MESSAGE);
+            }
+        });
+
+        return Gdk.EVENT_PROPAGATE;
+    }
+
     private void on_nick_error(IrcCore core, string nick, IrcNickError e, string human)
     {
+        switch (e) {
+            case IrcNickError.IN_USE:
+                /* Attempt to reuse the name with a _, if the nick was in use during
+                 * connection. */
+                if (!core.connected) {
+                    int count = core.get_data("nicktries");
+                    if (count >= 3) {
+                        warning("Attempted too many times to change nick!");
+                        core.disconnect();
+                        break;
+                    }
+                    core.set_nick(core.ident.nick + "_");
+                    count++;
+                    core.set_data("nicktries", count);
+                }
+                break;
+        }
         /* Placeholder, need to add dynamic support... */
         message("Got a NICK error! %s", human);
     }
