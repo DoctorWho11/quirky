@@ -379,6 +379,17 @@ window.
             min_params = 1,
             server = true
         };
+        /* Allow starting a PM.. */
+        commands["query"] = Command() {
+            cb = (line)=> {
+                var buffer = get_named_buffer(core, line);
+                ensure_view(core, buffer, line, true);
+            },
+            help = "%C <user>, start a query with a user",
+            min_params = 1,
+            max_params = 1,
+            server = true
+        };
 
         /* actions.. */
         var btn = new Gtk.MenuButton();
@@ -751,10 +762,22 @@ window.
         main_view.update_tabs(buffer, core.ident.nick);
     }
 
+    void activate_view(SidebarItem? item)
+    {
+        this.target = item.get_data("iuser");
+        this.core = item.get_data("icore");
+        var buf = get_named_buffer(core, this.target);
+        set_buffer(buf);
+        update_actions();
+        update_nick(core);
+        nick_reveal.set_reveal_child(false);
+        nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
+    }
+
     /**
      * Ensure we have a view for private messages
      */
-    private void ensure_view(IrcCore core, Gtk.TextBuffer buffer, string nick)
+    private void ensure_view(IrcCore core, Gtk.TextBuffer buffer, string nick, bool activate = false)
     {
         SidebarItem? item = buffer.get_data("sitem");
         if (item == null) {
@@ -763,17 +786,11 @@ window.
             buffer.set_data("sitem", item);
             item.set_data("iuser", nick);
             item.set_data("icore", core);
-
-            item.activated.connect(()=> {
-                this.target = item.get_data("iuser");
-                this.core = item.get_data("icore");
-                var buf = get_named_buffer(core, this.target);
-                set_buffer(buf);
-                update_actions();
-                update_nick(core);
-                nick_reveal.set_reveal_child(false);
-                nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
-            });
+            item.activated.connect(activate_view);
+        }
+        if (activate) {
+            var root = roots[core];
+            root.select_item(item);
         }
     }
 
