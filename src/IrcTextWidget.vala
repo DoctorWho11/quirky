@@ -284,8 +284,8 @@ public class IrcTextWidget : Gtk.TextView
             timestamp_length = stamp.length;
         }
 
-        buffer.insert_with_tags_by_name(i, stamp, -1, "timestamp", "default");
-        buffer.get_end_iter(out i);
+        buf.insert_with_tags_by_name(i, stamp, -1, "timestamp", "default");
+        buf.get_end_iter(out i);
 
         /* Custom formatting for certain message types.. */
         if (ttype == IrcTextType.MESSAGE) {
