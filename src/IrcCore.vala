@@ -215,9 +215,6 @@ public class IrcCore : Object
         this.id = IrcCore.sid;
         IrcCore.sid++;
 
-        disconnected.connect(()=> {
-            connected = false;
-        });
         established.connect(()=> {
             connected = true;
         });
@@ -250,7 +247,7 @@ public class IrcCore : Object
         return true;
     }
 
-    public async void connect(string host, uint16 port, bool use_ssl)
+    public new async void connect(string host, uint16 port, bool use_ssl)
     {
         try {
             var r = Resolver.get_default();
@@ -271,6 +268,7 @@ public class IrcCore : Object
             var resolv = addr.to_string();
             connecting(IrcConnectionStatus.CONNECTING, resolv, (int)port, @"Connecting to $(host)... ($(resolv):$(port))");
             var connection = yield client.connect_async(sock_addr, cancel);
+            (connection as TcpConnection).set_graceful_disconnect(true);
             if (connection != null) {
                 this.conn = connection;
                 this.client = client;
@@ -300,8 +298,25 @@ public class IrcCore : Object
             if (!cancel.is_cancelled()) {
                 cancel.cancel();
             }
-            disconnected(); /* Handle more better.. */
+            disconnect();
         }
+    }
+
+    public new void disconnect()
+    {
+        try {
+            if(!cancel.is_cancelled()) {
+                cancel.cancel();
+            }
+            if (this.conn != null) {
+                this.conn.close();
+                this.conn = null;
+            }
+            this.connected = false;
+        } catch (Error e) {
+            warning("Error while closing IRC: %s", e.message);
+        }
+        disconnected();
     }
 
     private void on_client_event(SocketClientEvent e, SocketConnectable? s, IOStream? con)
@@ -324,7 +339,7 @@ public class IrcCore : Object
             lock (outm) {
                 out_s = 0;
             }
-            disconnected();
+            disconnect();
             return false;
         }
         /* Kill this dispatch.. */
@@ -865,6 +880,20 @@ public class IrcCore : Object
         write_socket(@"%s %s :$(CTCP_PREFIX)%s$(CTCP_PREFIX)\r\n", msgtype, target, cmd);
     }
 
+    private void _write_socket(string fmt, ...)
+    {
+        va_list va = va_list();
+        string line = fmt.vprintf(va);
+        try {
+            if (dos != null) {
+                dos.put_string(line, null);
+                dos.flush(null);
+            }
+        } catch (Error e) {
+            warning("Failed to skip out_q: %s", e.message);
+        }
+    }
+
     /**
      * Quit from the IRC network.
      *
@@ -873,13 +902,11 @@ public class IrcCore : Object
     public void quit(string? quit_msg)
     {
         if (quit_msg != null) {
-            write_socket("QUIT :%s\r\n", quit_msg);
+            _write_socket("QUIT :%s\r\n", quit_msg);
         } else {
-            write_socket("QUIT\r\n");
+            _write_socket("QUIT\r\n");
         }
-        if (!cancel.is_cancelled()) {
-            cancel.cancel();
-        }
+        disconnect();
     }
 
     public void send_names(string? channel)
