@@ -85,8 +85,10 @@ public class IrcTextEntry : Gtk.Entry
 public class IrcTextWidget : Gtk.TextView
 {
     HashTable<int,string> mcols;
+    weak Gtk.TextTag? last_uri = null;
 
     public Gtk.TextTagTable tags { public get; private set; }
+    private Gdk.Cursor _link;
 
     public bool use_timestamp {
         public set {
@@ -125,6 +127,76 @@ public class IrcTextWidget : Gtk.TextView
         return b;
     }
 
+    /**
+     * Let us click URIs
+     */
+    public override bool button_press_event(Gdk.EventButton evt)
+    {
+        int bx;
+        int by;
+
+        if (evt.button != 1 || buffer == null) {
+            return base.button_press_event(evt);
+        }
+
+        Gtk.TextIter iter;
+        window_to_buffer_coords(Gtk.TextWindowType.TEXT, (int)evt.x, (int)evt.y, out bx, out by);
+        get_iter_at_location(out iter, bx, by);
+        foreach (var tag in iter.get_tags()) {
+            string uri = tag.get_data("_uri");
+            if (uri != null) {
+                try {
+                    AppInfo.launch_default_for_uri(uri, null);
+                } catch (Error e) {
+                    warning("Unable to launch URI: %s", e.message);
+                }
+                break;
+            }
+        }
+        return base.button_press_event(evt);
+    }
+
+    /**
+     * All this just lets us give a link effect for known URIs.
+     */
+    public override bool motion_notify_event(Gdk.EventMotion evt)
+    {
+        int bx;
+        int by;
+
+        if (buffer == null) {
+            return base.motion_notify_event(evt);
+        }
+        Gtk.TextIter iter;
+        weak Gtk.TextTag? wtag = null;
+        window_to_buffer_coords(Gtk.TextWindowType.TEXT, (int)evt.x, (int)evt.y, out bx, out by);
+        get_iter_at_location(out iter, bx, by);
+        bool g = false;
+        foreach (var tag in iter.get_tags()) {
+            string uri = tag.get_data("_uri");
+            if (uri != null) {
+                tag.underline = Pango.Underline.SINGLE;
+                wtag = tag;
+                g = true;
+                break;
+            }
+        }
+        if (last_uri != null && last_uri != wtag) {
+            last_uri.underline = tags.lookup("default").underline;
+            last_uri = null;
+        }
+        var win = get_window(Gtk.TextWindowType.TEXT);
+        if (!g) {
+            if (win.get_cursor() != null) {
+                win.set_cursor(null);
+            }
+        } else {
+            win.set_cursor(_link);
+            last_uri = wtag;
+        }
+        return base.motion_notify_event(evt);
+    }
+
     public override bool draw(Cairo.Context cr)
     {
         Gtk.Allocation alloc;
@@ -157,6 +229,8 @@ public class IrcTextWidget : Gtk.TextView
 
         visible_margin = true;
 
+        _link = new Gdk.Cursor(Gdk.CursorType.HAND1);
+
         tags = new Gtk.TextTagTable();
         var tag = new Gtk.TextTag("default");
         tag.font_desc = Pango.FontDescription.from_string("Monospace 10");
@@ -167,6 +241,10 @@ public class IrcTextWidget : Gtk.TextView
         tags.add(tag);
 
         tag = new Gtk.TextTag("action");
+        tags.add(tag);
+
+        /* currently we just underline the links on hover. */
+        tag = new Gtk.TextTag("url");
         tags.add(tag);
 
         tag = new Gtk.TextTag("spacing");
@@ -310,6 +388,8 @@ public class IrcTextWidget : Gtk.TextView
         }
     
         buf.get_end_iter(out i);
+        int msg_start = i.get_offset();
+
         /* Begin processing mirc colours.. */
         if (mirc_color(message)) {
             /* Manual handling of string.. */
@@ -437,6 +517,21 @@ public class IrcTextWidget : Gtk.TextView
         } else {
             buf.set_data("_lastnick", null);
         }
+
+        /* Process URLs */
+        var urls = get_urls(message);
+        if (urls.length > 0) {
+            foreach (var url in urls) {
+                Gtk.TextIter s;
+                Gtk.TextIter e;
+                buf.get_iter_at_offset(out s, msg_start+url.start);
+                buf.get_iter_at_offset(out e, msg_start+url.start+url.url.length);
+                var tag = buf.create_tag(null);
+                tag.set_data("_uri", url.url);
+                buf.apply_tag_by_name("url", s, e);
+                buf.apply_tag(tag, s, e);
+            }
+        }
         update_tabs(buf, whom);
 
         scroll_to_bottom(buffer);
@@ -506,4 +601,42 @@ public class IrcTextWidget : Gtk.TextView
 
         queue_draw();
     }
+
+    /**
+     * Inspiration comes from polari, who in turn used this regex:
+     * http://daringfireball.net/2010/07/improved_regex_for_matching_urls
+     */
+    private UrlMatch[] get_urls(string input)
+    {
+        string s = """(?i)\b((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’]))""";
+        UrlMatch[] ret = {};
+
+        try {
+            var r = new Regex(s);
+
+            MatchInfo inf;
+            r.match(input, 0, out inf);
+            while (inf.matches()) {
+                var wat = inf.fetch(0);
+                int offset;
+                int end;
+                inf.fetch_pos(0, out offset, out end);
+                var o = UrlMatch() {
+                    url = wat,
+                    start = offset,
+                    end = end
+                };
+                ret += o;
+                inf.next();
+            }
+        } catch (Error e) {} 
+        return ret;
+    }
+}
+
+protected struct UrlMatch
+{
+    string url;
+    int start;
+    int end;
 }
