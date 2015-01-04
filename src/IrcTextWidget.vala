@@ -33,7 +33,8 @@ public enum IrcTextType {
     MOTD,
     SERVER,
     ERROR,
-    INFO
+    INFO,
+    QUIT
 }
 
 /**
@@ -373,12 +374,6 @@ public class IrcTextWidget : Gtk.TextView
 
     public void add_message(Gtk.TextBuffer buf, string whom, string message, IrcTextType ttype)
     {
-        /* Don't ever use white/black */
-        int nick_index = (int) (whom.hash() % mcols.size());
-        if (nick_index < 2) {
-            nick_index = 2;
-        }
-
         string last_nick = buf.get_data("_lastnick");
 
         string[] default_tags = { "default" };
@@ -419,17 +414,19 @@ public class IrcTextWidget : Gtk.TextView
         /* Custom formatting for certain message types.. */
         if (ttype == IrcTextType.MESSAGE) {
             if (last_nick != whom) {
-                buf.insert_with_tags_by_name(i, whom + "\t", -1, "nickname", "m_" + mcols[nick_index], "default");
+                buf.insert_with_tags_by_name(i, whom + "\t", -1, "nickname", get_nick_color(whom), "default");
             } else {
                 buf.insert_with_tags_by_name(i, "\t", -1, "default");
             }
         } else if (ttype == IrcTextType.ACTION) {
-            buf.insert_with_tags_by_name(i, @"\t* $(whom) ", -1, "nickname", "m_" + mcols[nick_index], "action", "default");
+            buf.insert_with_tags_by_name(i, @"\t* $(whom) ", -1, "nickname", get_nick_color(whom), "action", "default");
+        } else if (ttype == IrcTextType.QUIT) {
+            buf.insert_with_tags_by_name(i, @"\t$(whom) ", -1, "nickname", get_nick_color(whom), "default");
         } else if (ttype == IrcTextType.JOIN || ttype == IrcTextType.PART || ttype == IrcTextType.ERROR || ttype == IrcTextType.INFO) {
             buf.insert_with_tags_by_name(i, @"\t* ", -1, "default");
             if (whom != "") {
                 buf.get_end_iter(out i);
-                buf.insert_with_tags_by_name(i, @"$(whom) ", -1, "nickname", "m_" + mcols[nick_index], "default");
+                buf.insert_with_tags_by_name(i, @"$(whom) ", -1, "nickname", get_nick_color(whom), "default");
             }
         } else {
             //if (ttype != IrcTextType.SERVER && ttype != IrcTextType.MOTD) {

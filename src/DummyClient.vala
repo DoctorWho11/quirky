@@ -240,6 +240,28 @@ window.
                 }
             });
         });
+        core.user_quit.connect((u,r)=> {
+            if (u.nick == ident.nick) {
+                /* Derp? */
+                return;
+            }
+            nicklists.foreach((cid,l)=> {
+                /* See if its valid for this server */
+                string? c = id_to_channel(core, cid);
+                if (c != null && nl_remove_user(core, c, u)) {
+                    /* Append a nick change message.. */
+                    var buf = get_named_buffer(core, c);
+                    if (buf != null) {
+                        /* Update the channel buffer.. */
+                        string quit_msg = "has quit IRC";
+                        if (r != null) {
+                            quit_msg += @" ($(r))";
+                        }
+                        main_view.add_message(buf, u.nick, quit_msg, IrcTextType.QUIT);
+                    }
+                }
+            });
+        });
     }
 
     private string? id_to_channel(IrcCore c, string id)
