@@ -35,6 +35,37 @@ public class DummyClient : Gtk.ApplicationWindow
 
     const string QUIT_MESSAGE = "Enough vacation-project testing for now!";
 
+    /**
+     * While in early alpha..
+     */
+    private void insert_disclaimer()
+    {
+        var buffer = new Gtk.TextBuffer(main_view.tags);
+        string msg = """
+This is barely alpha software, and may eat your cat, hamster or other cute pets.
+
+Note that many features are not yet implemented, so here is a heads up:
+
+ * DO NOT attempt commands other than /me right now, not implemented
+ * Any command (/cmd) will just go to the current channel
+ * This means do NOT PM NickServ! :)
+ * SSL connection will accept all certificates by default right now.
+    
+Please enjoy testing, and report any bugs that you find!
+This message won't be in the final versions :)
+
+In the mean time, connect to a network using the button at the top left of this
+window.
+
+ - ufee1dead""";
+
+        foreach (var line in msg.split("\n")) {
+            main_view.add_message(buffer, "", line, IrcTextType.MOTD);
+        }
+        // set_buffer looks for this or core.ident
+        buffer.set_data("longestnick", "info");
+        set_buffer(buffer);
+    }
     private void update_actions()
     {
         (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected);
@@ -379,10 +410,13 @@ public class DummyClient : Gtk.ApplicationWindow
 
         set_default_size(800, 550);
         window_position = Gtk.WindowPosition.CENTER;
+
+        insert_disclaimer();
+        /*
         Idle.add(()=> {
             show_connect_dialog();
             return false;
-        });
+        });*/
     }
 
     private void update_nick(IrcCore core)
