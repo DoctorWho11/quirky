@@ -127,8 +127,13 @@ window.
 
         core.names_list.connect((c,u)=> {
             /* Could be /NAMES response.. */
-            foreach (var user in u) {
-                nl_add_user(core, c, user);
+            if (get_nicklist(core,c,false) == null) {
+                foreach (var user in u) {
+                    nl_add_user(core, c, user);
+                }
+                if (core == this.core && this.target == c) {
+                    nick_list.set_model(get_nicklist(core, c));
+                }
             }
             message("Got names list for %s", c);
         });
@@ -174,7 +179,7 @@ window.
                     update_actions();
                     update_nick(core);
                     /* select appropriate nicklist.. */
-                    var nlist = get_nicklist(core, this.target);
+                    var nlist = get_nicklist(core, this.target, false);
                     nick_list.set_model(nlist);
                     nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
                     nick_reveal.set_reveal_child(true);
