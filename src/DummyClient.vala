@@ -18,10 +18,14 @@ public class DummyClient : Gtk.ApplicationWindow
     IrcSidebar sidebar;
     string? target;
     Gtk.ToggleButton nick_button;
+    Gtk.TreeView nick_list;
 
     HashTable<string,Gtk.TextBuffer> buffers;
+    HashTable<string,Gtk.ListStore> nicklists;
 
     HashTable<IrcCore?,SidebarExpandable> roots;
+
+    Gtk.Revealer nick_reveal;
 
     const string QUIT_MESSAGE = "Enough vacation-project testing for now!";
 
@@ -42,6 +46,9 @@ public class DummyClient : Gtk.ApplicationWindow
             buf.set_data("longestnick", " ");
             set_buffer(buf);
             update_nick(core);
+
+            nick_reveal.set_reveal_child(false);
+            nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
         });
         /* Need moar status in window.. */
         message("Connecting to %s:%d", host, port);
@@ -52,6 +59,14 @@ public class DummyClient : Gtk.ApplicationWindow
         core.set_data("autojoin", autojoin);
         /* Now switch view.. */
         sidebar.select_row(header);
+
+        core.names_list.connect((c,u)=> {
+            /* Could be /NAMES response.. */
+            foreach (var user in u) {
+                nl_add_user(core, c, user);
+            }
+            message("Got names list for %s", c);
+        });
 
         core.connecting.connect((s,h,p,m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
@@ -93,6 +108,11 @@ public class DummyClient : Gtk.ApplicationWindow
                     set_buffer(buf);
                     update_actions();
                     update_nick(core);
+                    /* select appropriate nicklist.. */
+                    var nlist = get_nicklist(core, this.target);
+                    nick_list.set_model(nlist);
+                    nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
+                    nick_reveal.set_reveal_child(true);
                 });
                 root.set_expanded(true);
                 root.select_item(item);
@@ -101,8 +121,11 @@ public class DummyClient : Gtk.ApplicationWindow
             } else {
                 var buf = get_named_buffer(core, c); /* do nothing :P */
                 main_view.add_message(buf, u.nick, @"has joined $(c)", IrcTextType.JOIN);
+
+                nl_add_user(core, c, u);
             }
         });
+
         core.parted_channel.connect((u,c,r)=> {
             string msg = @"has left $(c)";
             if (r != null) {
@@ -110,6 +133,8 @@ public class DummyClient : Gtk.ApplicationWindow
             }
             var buf = get_named_buffer(core, c);
             main_view.add_message(buf, u.nick == core.ident.nick ? "" : u.nick, msg, IrcTextType.PART);
+
+            nl_remove_user(core, c, u);
         });
         core.motd_start.connect((m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
@@ -144,6 +169,43 @@ public class DummyClient : Gtk.ApplicationWindow
             buffers[compname].set_data("ignoretab", true);
         }
         return buffers[compname];
+    }
+
+    private unowned Gtk.ListStore get_nicklist(IrcCore c, string channel)
+    {
+        string compname = @"$(c.id)$(name)";
+        Gtk.ListStore? list;
+        if (compname in nicklists) {
+            list = nicklists[compname];
+        } else {
+            list = new Gtk.ListStore(2, typeof(string), typeof(IrcUser));
+            //list.set_sort_column_id(0, Gtk.SortType.ASCENDING);
+            list.set_sort_func(1, nick_compare);
+            list.set_sort_column_id(1, Gtk.SortType.ASCENDING);
+            nicklists[compname] = list;
+        }
+        return nicklists[compname];
+    }
+
+    /**
+     * Currently very trivial IrcUser comparison..
+     */
+    public int nick_compare(Gtk.TreeModel tmodel, Gtk.TreeIter a, Gtk.TreeIter b)
+    {
+        var model = tmodel as Gtk.ListStore;
+        IrcUser? ia;
+        IrcUser? ib;
+        model.get(a, 1, out ia, -1);
+        model.get(b, 1, out ib, -1);
+
+        if (ia.op != ib.op) {
+            if (ia.op) {
+                return -1;
+            }
+            return 1;
+        }
+
+        return strcmp(ia.nick.down(), ib.nick.down());
     }
 
     public DummyClient(Gtk.Application application)
@@ -227,6 +289,7 @@ public class DummyClient : Gtk.ApplicationWindow
 
         buffers = new HashTable<string,Gtk.TextBuffer>(str_hash, str_equal);
         roots = new HashTable<IrcCore?,SidebarExpandable>(direct_hash, direct_equal);
+        nicklists =  new HashTable<string,Gtk.ListStore>(str_hash, str_equal);
 
         var layout = new Gtk.Box(Gtk.Orientation.VERTICAL, 3);
         main_layout.pack_start(layout, true, true, 0);
@@ -279,6 +342,25 @@ public class DummyClient : Gtk.ApplicationWindow
         input.activate.connect(send_text);
         bottom.pack_end(input, true, true, 0);
 
+        /* Nicklist. */
+        nick_list = new Gtk.TreeView();
+        nick_list.set_headers_visible(false);
+        var nscroll = new Gtk.ScrolledWindow(null, null);
+        nscroll.set_shadow_type(Gtk.ShadowType.IN);
+        nscroll.margin = 3;
+        nscroll.margin_left = 0;
+        nscroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
+        var render = new Gtk.CellRendererText();
+        render.set_padding(20, 5);
+        render.alignment = Pango.Alignment.LEFT;
+        nick_list.insert_column_with_attributes(-1, "Name", render, "text", 0);
+
+        nscroll.add(nick_list);
+        nick_reveal = new Gtk.Revealer();
+        nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
+        nick_reveal.add(nscroll);
+        main_layout.pack_end(nick_reveal, false, false, 0);
+
         delete_event.connect(handle_quit);
 
         set_default_size(800, 550);
@@ -295,6 +377,42 @@ public class DummyClient : Gtk.ApplicationWindow
             nick_button.set_sensitive(core.connected);
             nick_button.set_label(core.ident.nick);
         }
+    }
+
+    private void nl_remove_user(IrcCore core, string channel, IrcUser user)
+    {
+        /* Remove user from nicklist */
+        var nlist = get_nicklist(core, channel);
+        Gtk.TreeIter iter;
+        nlist.get_iter_first(out iter);
+        while (true) {
+            IrcUser? u;
+            nlist.get(iter, 1, out u, -1);
+            if (u.nick == user.nick) {
+                /* Found him. */
+                nlist.remove(iter);
+                break;
+            }
+            if (!nlist.iter_next(ref iter)) {
+                break;
+            }
+        }
+    }
+
+    private void nl_add_user(IrcCore core, string channel, IrcUser user)
+    {
+        var list = get_nicklist(core, channel);
+
+        Gtk.TreeIter iter;
+        list.append(out iter);
+
+        IrcUser copy = IrcUser();
+        copy.username = user.username;
+        copy.nick = user.nick;
+        copy.op = user.op;
+        copy.hostname = user.hostname;
+
+        list.set(iter, 0, copy.nick, 1, copy);
     }
 
     public bool handle_quit(Gdk.EventAny evt)

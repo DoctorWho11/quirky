@@ -70,9 +70,9 @@ public class DummyBot
         });
 
         irc.names_list.connect((c,l)=> {
-            message("%s has %u users", c, l.length());
+            message("%s has %u users", c, l.length);
             foreach (var u in l) {
-                message("User on %s: %s", c, u);
+                message("User on %s: %s", c, u.nick);
             }
         });
 

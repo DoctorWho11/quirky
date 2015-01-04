@@ -54,6 +54,8 @@ public struct IrcUser {
     string nick;
     string username;
     string hostname;
+    bool op;
+    bool voice;
 }
 
 public enum IrcMessageType {
@@ -145,7 +147,7 @@ public class IrcCore : Object
     public signal void motd(string motd, string end);
 
     /* Emitted when we get the names list (complete) */
-    public signal void names_list(string channel, List<string> users);
+    public signal void names_list(string channel, IrcUser[] users);
     public signal void disconnected();
 
     /**
@@ -566,11 +568,7 @@ public class IrcCore : Object
                     break;
                 }
                 cc = channel_cache[params[1]];
-                /* Update list in main channel store if it exists */
-                if (channels.contains(params[1])) {
-                    channels[params[1]].users = cc.users.copy();
-                }
-                names_list(params[1], cc.users);
+                names_list(params[1], cc.get_users());
                 channel_cache.remove(params[1]);
                 break;
 
@@ -935,8 +933,7 @@ public class IrcCore : Object
 public class Channel {
 
     /* Known user list for this channel */
-    /* NOTE: Linked lists are evil slow, replace in future.. */
-    public List<string> users;
+    public HashTable<string,IrcUser?> users;
     public string name { public get; private set; }
     public string mode { public get; private set; }
 
@@ -944,44 +941,67 @@ public class Channel {
 
     public Channel(string name, string mode)
     {
-        users = new List<string>();
         this.name = name;
         this.mode = mode;
+        users = new HashTable<string,IrcUser?>(str_hash,str_equal);
         final = false;
     }
 
+    public IrcUser[] get_users()
+    {
+        IrcUser[] ret = {};
+        users.foreach((k,v)=> {
+            ret += v;
+        });
+        return ret;
+    }
+
+    /**
+     * COMPLETELY TEMPORARY.
+     * Going to pull prefixes from RPL_ISUPPORT...
+     */
     public void add_user(string user)
     {
-        if (users.find_custom(user, strcmp) == null) {
-            users.append(user);
+        if (!(user in users)) {
+            IrcUser u  = IrcUser();
+            u.nick = user;
+            unichar c = u.nick.get_char(0);
+            if (c == '@') {
+                u.op = true;
+                u.nick = u.nick.substring(1);
+            } else if (c == '+') {
+                u.voice = true;
+                u.nick = u.nick.substring(1);
+            }
+            users[u.nick] = u;
         }
     }
 
     public bool has_user(string user)
     {
-        unowned List<string>? elem = users.find_custom(user, strcmp);
-        return (elem != null);
+        return users.contains(user);
     }
 
     public void rename_user(string old, string newname)
     {
-        unowned List<string>? elem = users.find_custom(old, strcmp);
-        if (elem != null) {
-            elem.data = newname;
+        if (old in users) {
+            IrcUser oldu = users[old];
+            oldu.nick = newname;
+            users.remove(old);
+            users[newname] = oldu;
         }
     }
 
     public void remove_user(string user)
     {
-        unowned List<string>? elem = users.find_custom(user, strcmp);
-        if (elem != null) {
-            users.remove_link(elem);
+        if (user in users) {
+            users.remove(user);
         }
     }
 
     public void reset_users()
     {
-        users = new List<string>();
+        users.remove_all();
         final = false;
     }
 }
