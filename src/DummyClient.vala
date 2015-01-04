@@ -431,8 +431,6 @@ public class DummyClient : Gtk.ApplicationWindow
             icon_name = OP_ICON;
         } else if (copy.voice) {
             icon_name = VOICE_ICON;
-        } else {
-            icon_name = VOICE_ICON;
         }
 
         list.set(iter, 0, copy.nick, 1, copy, 2, icon_name);
