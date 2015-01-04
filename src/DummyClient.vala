@@ -26,6 +26,8 @@ public class DummyClient : Gtk.ApplicationWindow
     HashTable<IrcCore?,SidebarExpandable> roots;
 
     Gtk.Revealer nick_reveal;
+    Gtk.Revealer side_reveal;
+
 
     const string VOICE_ICON = "non-starred-symbolic";
     const string HALFOP_ICON = "semi-starred-symbolic";
@@ -54,6 +56,8 @@ public class DummyClient : Gtk.ApplicationWindow
             nick_reveal.set_reveal_child(false);
             nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
         });
+        side_reveal.set_reveal_child(true);
+
         /* Need moar status in window.. */
         message("Connecting to %s:%d", host, port);
 
@@ -289,7 +293,10 @@ public class DummyClient : Gtk.ApplicationWindow
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
         sidebar = new IrcSidebar();
         scroll.add(sidebar);
-        main_layout.pack_start(scroll, false, false, 0);
+        side_reveal = new Gtk.Revealer();
+        side_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_RIGHT);
+        side_reveal.add(scroll);
+        main_layout.pack_start(side_reveal, false, false, 0);
 
         buffers = new HashTable<string,Gtk.TextBuffer>(str_hash, str_equal);
         roots = new HashTable<IrcCore?,SidebarExpandable>(direct_hash, direct_equal);
@@ -423,6 +430,8 @@ public class DummyClient : Gtk.ApplicationWindow
         if (copy.op) {
             icon_name = OP_ICON;
         } else if (copy.voice) {
+            icon_name = VOICE_ICON;
+        } else {
             icon_name = VOICE_ICON;
         }
 
