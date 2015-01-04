@@ -878,6 +878,16 @@ public class IrcCore : Object
         write_socket(@"%s %s :$(CTCP_PREFIX)%s$(CTCP_PREFIX)\r\n", msgtype, target, cmd);
     }
 
+    /**
+     * Send a raw string to the server (i.e. no processing from library)
+     *
+     * @param line The line to send
+     */
+    public void send_quote(string line)
+    {
+        write_socket("%s\r\n", line);
+    }
+
     private void _write_socket(string fmt, ...)
     {
         va_list va = va_list();

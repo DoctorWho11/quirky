@@ -314,6 +314,15 @@ window.
             max_params = 1,
             server = true
         };
+        /* Allow raw quoting, no error handling for this atm. */
+        commands["quote"] = Command() {
+            cb = (line)=> {
+                core.send_quote(line);
+            },
+            help = "%C <text>, send raw text to the server",
+            min_params = 1,
+            server = true
+        };
 
         /* actions.. */
         var btn = new Gtk.MenuButton();
