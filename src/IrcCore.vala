@@ -597,23 +597,27 @@ public class IrcCore : Object
             /* Nick error handling */
             case IRC.ERR_NICKNAMEINUSE:
                 string msg;
-                parse_simple(sender, remnant, null, null, out msg);
-                nick_error(ident.nick, IrcNickError.IN_USE, msg);
+                string[] params;
+                parse_simple(sender, remnant, null, out params, out msg);
+                nick_error(params.length > 1 ? params[1] : ident.nick , IrcNickError.IN_USE, msg);
                 break;
             case IRC.ERR_NONICKNAMEGIVEN:
                 string msg;
-                parse_simple(sender, remnant, null, null, out msg);
-                nick_error(ident.nick, IrcNickError.NO_NICK, msg);
+                string[] params;
+                parse_simple(sender, remnant, null, out params, out msg);
+                nick_error(params.length > 1 ? params[1] : ident.nick, IrcNickError.NO_NICK, msg);
                 break;
             case IRC.ERR_ERRONEUSNICKNAME:
                 string msg;
-                parse_simple(sender, remnant, null, null, out msg);
-                nick_error(ident.nick, IrcNickError.INVALID, msg);
+                string[] params;
+                parse_simple(sender, remnant, null, out params, out msg);
+                nick_error(params.length > 1 ? params[1] : ident.nick, IrcNickError.INVALID, msg);
                 break;
             case IRC.ERR_NICKCOLLISION:
                 string msg;
-                parse_simple(sender, remnant, null, null, out msg);
-                nick_error(ident.nick, IrcNickError.COLLISION, msg);
+                string[] params;
+                parse_simple(sender, remnant, null, out params, out msg);
+                nick_error(params.length > 1 ? params[1] : ident.nick, IrcNickError.COLLISION, msg);
                 break;
             default:
                 break;
