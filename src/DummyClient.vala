@@ -614,25 +614,39 @@ window.
 
     private void on_nick_error(IrcCore core, string nick, IrcNickError e, string human)
     {
+        /* Note, these messages should ideally go to the *current* view. */
         switch (e) {
             case IrcNickError.IN_USE:
                 /* Attempt to reuse the name with a _, if the nick was in use during
                  * connection. */
+                var buffer = get_named_buffer(core, "\\ROOT\\");
+                main_view.add_error(buffer, "%s is already in use", nick);
+                string? tmp_nick = core.get_data("attemptnick");
+                if (tmp_nick == null) {
+                    tmp_nick = core.ident.nick;
+                }
+
+                tmp_nick += "_";
+
                 if (!core.connected) {
                     int count = core.get_data("nicktries");
                     if (count >= 3) {
-                        warning("Attempted too many times to change nick!");
+                        main_view.add_error(buffer, "Attempted too many times to change nick");
+                        main_view.add_error(buffer, "Disconnecting");
                         core.disconnect();
                         break;
                     }
-                    core.set_nick(core.ident.nick + "_");
+                    core.set_nick(tmp_nick);
                     count++;
                     core.set_data("nicktries", count);
+                    core.set_data("attemptnick", tmp_nick);
                 }
                 break;
+            default:
+                var buffer = get_named_buffer(core, "\\ROOT\\");
+                main_view.add_error(buffer, "%s: %s", nick, human);
+                break;
         }
-        /* Placeholder, need to add dynamic support... */
-        message("Got a NICK error! %s", human);
     }
 
     /**
