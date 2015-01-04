@@ -295,12 +295,23 @@ window.
             help = "%C <action>, sends an \"action\" to the current channel or person",
             min_params = 1
         };
+        /* Handle /join */
         commands["join"] = Command() {
             cb = (line)=> {
                 core.join_channel(line);
             },
             help = "%C <channel> [password], join the given channel with an optional password",
             min_params = 1,
+            server = true
+        };
+        /* Handle /nick */
+        commands["nick"] = Command() {
+            cb = (line)=> {
+                core.set_nick(line);
+            },
+            help = "%C <nickname>, set your new nickname on this IRC server",
+            min_params = 1,
+            max_params = 1,
             server = true
         };
 
@@ -727,13 +738,14 @@ window.
             }
             return;
         }
-        if (r.length > command.max_params && command.max_params > command.min_params) {
+        if (r.length > command.max_params && command.max_params >= command.min_params) {
             if (command.help != null) {
                 var parsed = template(command.help, cmd.up());
                 main_view.add_error(main_view.buffer, "Usage: %s", parsed);
             } else {
                 main_view.add_error(main_view.buffer, "Invalid use of /%s", cmd);
             }
+            return;
         }
         string? remnant;
         if (r.length >= 1) {
