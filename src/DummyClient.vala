@@ -61,6 +61,8 @@ public class DummyClient : Gtk.ApplicationWindow
     const string QUIT_MESSAGE = "Enough vacation-project testing for now!";
     const string JOIN_STRING = "Please try to /JOIN a channel first";
 
+    bool is_channel = false;
+
     /**
      * While in early alpha..
      */
@@ -72,10 +74,11 @@ This is barely alpha software, and may eat your cat, hamster or other cute pets.
 
 Note that many features are not yet implemented, so here is a heads up:
 
- * DO NOT attempt commands other than /me right now, not implemented
- * Any command (/cmd) will just go to the current channel
- * This means do NOT PM NickServ! :)
+ * STARTTLS is currently disabled until CAP is implemented
  * SSL connection will accept all certificates by default right now.
+ * For implemented commands, type /HELP
+ * Unimplemented commands can be bypassed with /QUOTE, but may cause issues!!
+ * Missing modes, kick support, etc.
     
 Please enjoy testing, and report any bugs that you find!
 This message won't be in the final versions :)
@@ -110,6 +113,7 @@ window.
             buf.set_data("longestnick", " ");
             set_buffer(buf);
             update_nick(core);
+            this.is_channel = false;
 
             nick_reveal.set_reveal_child(false);
             nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
@@ -182,6 +186,7 @@ window.
                         var nbuf = get_named_buffer(core, c);
                         this.core = item.get_data("icore");
                         this.target = item.get_data("ichannel");
+                        this.is_channel = true;
                         set_buffer(nbuf);
                         update_actions();
                         update_nick(core);
@@ -418,7 +423,7 @@ window.
         commands["part"] = Command() {
             cb = (line)=> {
                 if (line == null) {
-                    if (this.target == null) {
+                    if (this.target == null || !this.is_channel) {
                         main_view.add_error(main_view.buffer, JOIN_STRING);
                     } else {
                         /* Current channel. (no default part message yet) */
@@ -853,6 +858,15 @@ window.
             input.set_text("");
             return;
         }
+        if (is_channel) {
+            SidebarItem? item = main_view.buffer.get_data("sitem");
+            /* parted, etc. */
+            if (!item.usable) {
+                main_view.add_error(main_view.buffer, JOIN_STRING);
+                input.set_text("");
+                return;
+            }
+        }
         if (target == null) {
             main_view.add_error(main_view.buffer, JOIN_STRING);
             input.set_text("");
@@ -883,6 +897,7 @@ window.
         update_nick(core);
         nick_reveal.set_reveal_child(false);
         nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
+        this.is_channel = false;
     }
 
     /**
