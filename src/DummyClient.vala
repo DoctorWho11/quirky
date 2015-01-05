@@ -179,9 +179,9 @@ window.
                 if (buf == null) {
                     item = root.add_item(c, "user-available-symbolic");
                     item.set_data("icore", core);
-                    item.set_data("ichannel", c);
                     var tbuf = get_named_buffer(core, c);
                     tbuf.set_data("sitem", item); // Maybe its time to subclass TextBuffer :p
+                    is_channel = true;
                     item.activated.connect(()=> {
                         var nbuf = get_named_buffer(core, c);
                         this.core = item.get_data("icore");
@@ -202,6 +202,8 @@ window.
                     item = buf.get_data("sitem");
                     item.usable = true;
                 }
+                item.set_data("ichannel", c);
+
                 root.set_expanded(true);
                 root.select_item(item);
                 main_view.add_message(buf, "", @"You have joined $(c)", IrcTextType.JOIN);
@@ -224,6 +226,7 @@ window.
             if (u.nick == core.ident.nick) {
                 SidebarItem? item = buf.get_data("sitem");
                 item.usable = false;
+                item.set_data("ichannel", null);
                 nl_destroy(core, c);
                 if (this.target == c) {
                     this.target = null;
@@ -319,8 +322,11 @@ window.
         return buffers[compname];
     }
 
-    private unowned Gtk.ListStore? get_nicklist(IrcCore c, string channel, bool create = true)
+    private unowned Gtk.ListStore? get_nicklist(IrcCore c, string? channel, bool create = true)
     {
+        if (channel == null) {
+            return null;
+        }
         string compname = @"$(c.id)$(channel)";
         Gtk.ListStore? list;
         if (compname in nicklists) {
@@ -857,15 +863,6 @@ window.
             main_view.add_error(main_view.buffer, "You are not currently connected");
             input.set_text("");
             return;
-        }
-        if (is_channel) {
-            SidebarItem? item = main_view.buffer.get_data("sitem");
-            /* parted, etc. */
-            if (!item.usable) {
-                main_view.add_error(main_view.buffer, JOIN_STRING);
-                input.set_text("");
-                return;
-            }
         }
         if (target == null) {
             main_view.add_error(main_view.buffer, JOIN_STRING);
