@@ -171,6 +171,8 @@ window.
                 var item = root.add_item(c, "user-available-symbolic");
                 item.set_data("icore", core);
                 item.set_data("ichannel", c);
+                var tbuf = get_named_buffer(core, c);
+                tbuf.set_data("sitem", item); // Maybe its time to subclass TextBuffer :p
                 item.activated.connect(()=> {
                     var buf = get_named_buffer(core, c);
                     this.core = item.get_data("icore");
@@ -197,14 +199,23 @@ window.
         });
 
         core.parted_channel.connect((u,c,r)=> {
-            string msg = @"has left $(c)";
+            string msg = u.nick == core.ident.nick ? @"You have left $(c)" : @"has left $(c)";
             if (r != null) {
                 msg += @" ($(r))";
             }
             var buf = get_named_buffer(core, c);
             main_view.add_message(buf, u.nick == core.ident.nick ? "" : u.nick, msg, IrcTextType.PART);
-
-            nl_remove_user(core, c, u);
+            /* Did **we** leave? :o */
+            if (u.nick == core.ident.nick) {
+                SidebarItem? item = buf.get_data("sitem");
+                item.usable = false;
+                nl_destroy(core, c);
+                if (this.target == c) {
+                    this.target = null;
+                }
+            } else {
+                nl_remove_user(core, c, u);
+            }
         });
         core.motd_start.connect((m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
@@ -557,6 +568,19 @@ window.
             nick_button.set_sensitive(core.connected);
             nick_button.set_label(core.ident.nick);
         }
+    }
+
+    private void nl_destroy(IrcCore core, string channel)
+    {
+        var nlist = get_nicklist(core, channel, false);
+        if (nlist == null) {
+            return;
+        }
+        if (nick_list.get_model() == nlist) {
+            nick_list.set_model(null);
+        }
+        nicklists.remove(@"$(core.id)$(channel)");
+        nlist = null;
     }
 
     private bool nl_remove_user(IrcCore core, string channel, IrcUser user)
