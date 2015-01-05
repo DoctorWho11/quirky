@@ -32,5 +32,16 @@ public enum IRC {
 
     /* Not really official constants but meh. */
     TLS_BEGIN = 670,
-    TLS_FAIL = 691
+    TLS_FAIL = 691,
+
+    /* SASL auth */
+    RPL_LOGGEDIN = 900,
+    RPL_LOGGEDOUT = 901,
+    ERR_NICKLOCKED = 902,
+    RPL_SASLSUCCESS = 903,
+    ERR_SASLFAIL = 904,
+    ERR_SASLTOOLONG = 905,
+    ERR_SASLABORTED = 906,
+    ERR_SASLALREADY = 907,
+    RPL_SASLMECHS = 908,
 }

@@ -136,6 +136,11 @@ public class IrcCore : Object
     InetSocketAddress sock_addr;
     bool tls_pending = false;
 
+    private string[] capabilities;
+    private string[] cap_requests;
+    private string[] cap_denied;
+    private string[] cap_granted;
+
     const unichar CTCP_PREFIX = '\x01';
 
     /** Allows tracking of connected state.. */
@@ -290,6 +295,11 @@ public class IrcCore : Object
             setup_io();
             /* Attempt identification immediately, get the ball rolling */
             connecting(IrcConnectionStatus.REGISTERING, addr.to_string(), (int)port, "Logging in...");
+
+            /**
+             * Request capabilities immediately..
+             */
+            write_socket("CAP LS\r\n");
 
             /* Send TLS immediately..
              * If a server doesn't support this we'll end up with a registration
@@ -579,6 +589,22 @@ public class IrcCore : Object
             case IRC.TLS_FAIL:
                 warning(TLS_BANNER);
                 break;
+
+            /* SASL magicks. */
+            case IRC.RPL_LOGGEDIN:
+                message("SASL auth success");
+                write_socket("CAP END\r\n");
+                break;
+
+            case IRC.ERR_NICKLOCKED:
+            case IRC.ERR_SASLFAIL:
+            case IRC.ERR_SASLTOOLONG:
+            case IRC.ERR_SASLABORTED:
+            case IRC.ERR_SASLALREADY:
+                /* SASL failed, basically. */
+                warning("SASL authentication failed with numeric: %d", numeric);
+                write_socket("CAP END\r\n");
+                break;
             /* Server info parsing, goodie! */
             case IRC.RPL_ISUPPORT:
                 string[] params;
@@ -724,6 +750,30 @@ public class IrcCore : Object
         }
     }
 
+    /*
+     * Very simple, construct PLAIN mechanism string for SASL auth
+     */
+    string sasl_plain(string authid, string authcd, string passwd)
+    {
+        uchar[] data = authid.data;
+        data += '\0';
+        for (int i=0; i < authcd.length; i++) {
+            data += authcd.data[i];
+        }
+        data += '\0';
+        for (int i=0; i < passwd.length; i++) {
+            data += passwd.data[i];
+        }
+        return Base64.encode(data);
+    }
+
+    async void sasl_auth()
+    {
+        /*
+        var send = sasl_plain("jimbob", "jimbob", "somepass"");
+        write_socket("AUTHENTICATE %s\r\n", send); */
+    }
+
     /**
      * Handle a command from the server (string)
      *
@@ -741,6 +791,9 @@ public class IrcCore : Object
                     var send = line.replace("PING", "PONG");
                     write_socket("%s\r\n", send);
                     return;
+                case "AUTHENTICATE":
+                    yield sasl_auth();
+                    break;
                 default:
                     /* Error, etc, not yet supported */
                     return;
@@ -748,6 +801,50 @@ public class IrcCore : Object
         }
 
         switch (command) {
+            /* caps handling */
+            case "CAP":
+                string msg;
+                string[] params;
+                parse_simple(sender, remnant, null, out params, out msg);
+                if (params[1] == "LS") {
+                    /* CAP LS response */
+                    msg = msg.strip();
+                    capabilities = msg.split(" ");
+
+                    /** Note, we don't actually request any CAPS yet. */
+
+                    if (cap_requests.length > 0) {
+                        write_socket("CAP REQ :%s\r\n", string.joinv(" ", cap_requests));
+                    }
+                } else if (params[1] == "ACK") {
+                    /* Got a requested capability */
+                    foreach (var ack in msg.split(" ")) {
+                        if (ack.strip() == "") {
+                            continue;
+                        }
+                        cap_granted += ack;
+                    }
+                } else if (params[1] == "NAK") {
+                    /* Denid a requested capability */
+                    foreach (var nack in msg.split(" ")) {
+                        if (nack.strip() == "") {
+                            continue;
+                        }
+                        cap_denied += nack;
+                    }
+                }
+                if (cap_requests.length == cap_denied.length + cap_granted.length) {
+                    /* Permit completion of SASL auth */
+                    if (!("sasl" in cap_granted)) {
+                        write_socket("CAP END\r\n");
+                    }
+                }
+                /* Deal with SASL auth. */
+                if ("sasl" in cap_granted) {
+                    /* For now we only support PLAIN */
+                    write_socket("AUTHENTICATE PLAIN\r\n");
+                }
+                break;
             case "PRIVMSG":
             case "NOTICE":
                 IrcUser user;
