@@ -443,6 +443,26 @@ window.
             max_params = -1,
             server = true
         };
+        /* Currently personal favourite. :P */
+        commands["cycle"] = Command() {
+            cb = (line)=> {
+                if (line == null) {
+                    if (this.target == null) {
+                        main_view.add_error(main_view.buffer, JOIN_STRING);
+                    } else {
+                        core.part_channel(this.target, null);
+                        core.join_channel(this.target);
+                    }
+                } else {
+                    core.part_channel(line, null);
+                    core.join_channel(line);
+                }
+            },
+            help = "%C [channel], part and immediately rejoin the channel",
+            min_params = 0,
+            max_params = 1,
+            server = true
+        };
 
         /* actions.. */
         var btn = new Gtk.MenuButton();
