@@ -782,7 +782,7 @@ window.
         SidebarItem? item = buffer.get_data("sitem");
         if (item == null) {
             var root = roots[core];
-            item = root.add_item(nick, "user-info-symbolic");
+            item = root.add_item(nick, "avatar-default-symbolic");
             buffer.set_data("sitem", item);
             item.set_data("iuser", nick);
             item.set_data("icore", core);
