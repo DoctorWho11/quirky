@@ -640,7 +640,7 @@ public class IrcCore : Object
                 string msg;
                 unowned Channel? cc;
 
-                parse_simple(sender, remnant, null, out params, out msg);
+                parse_simple(sender, remnant, null, out params, out msg, true);
                 if (params.length != 3) {
                     warning("Invalid NAMREPLY parameter length!");
                     break;
@@ -662,7 +662,7 @@ public class IrcCore : Object
                 string[] params;
                 string msg; /* End of /NAMES, not really interesting. */
                 unowned Channel? cc;
-                parse_simple(sender, remnant, null, out params, out msg);
+                parse_simple(sender, remnant, null, out params, out msg, true);
                 if (!channel_cache.contains(params[1])) {
                     warning("Got RPL_ENDOFNAMES without cached list!");
                     break;
@@ -785,7 +785,7 @@ public class IrcCore : Object
             case "JOIN":
                 IrcUser user;
                 string channel;
-                parse_simple(sender, remnant, out user, null, out channel);
+                parse_simple(sender, remnant, out user, null, out channel, true);
                 joined_channel(user, channel);
                 break;
             case "PART":
@@ -864,15 +864,20 @@ public class IrcCore : Object
 
         int i;
         if (last_colon) {
-            i = remnant.last_index_of(":");
+            i = remnant.last_index_of(" :");
         } else {
-            i = remnant.index_of(":");
+            i = remnant.index_of(" :");
         }
-        if (i < 0 || i == remnant.length) {
+
+        if (i < 0 || i+1 == remnant.length ) {
             params = null;
             rhs = remnant;
+            if (rhs.has_prefix(":")) {
+                rhs = remnant.substring(1);
+            }
             return;
         }
+        i++;
 
         /* For now, space separated. May expand in future to suit API */
         string pms = remnant.substring(0, i);
