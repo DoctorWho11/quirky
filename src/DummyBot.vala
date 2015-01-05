@@ -143,7 +143,7 @@ public class DummyBot
     
     public void run_bot()
     {
-        irc.connect.begin("localhost", 6667, false, false()=> {
+        irc.connect.begin("localhost", 6667, false, false, ()=> {
             stdout.printf("Loop quit\n");
             loop.quit();
         });
