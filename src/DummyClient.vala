@@ -59,6 +59,7 @@ public class DummyClient : Gtk.ApplicationWindow
     const string OP_ICON = "starred-symbolic";
 
     const string QUIT_MESSAGE = "Enough vacation-project testing for now!";
+    const string JOIN_STRING = "Please try to /JOIN a channel first";
 
     /**
      * While in early alpha..
@@ -418,10 +419,16 @@ window.
             cb = (line)=> {
                 if (line == null) {
                     if (this.target == null) {
-                        warning("CRAQMONKIES");
+                        main_view.add_error(main_view.buffer, JOIN_STRING);
+                    } else {
+                        /* Current channel. (no default part message yet) */
+                        SidebarItem? item = main_view.buffer.get_data("sitem");
+                        if (item.usable) {
+                            main_view.add_error(main_view.buffer, JOIN_STRING);
+                        } else {
+                            core.part_channel(this.target, null);
+                        }
                     }
-                    /* Current channel. (no default part message yet) */
-                    core.part_channel(this.target, null);
                 } else {
                     var splits = line.strip().split(" ");
                     if (splits.length == 1) {
@@ -802,7 +809,7 @@ window.
             return;
         }
         if (target == null) {
-            main_view.add_error(main_view.buffer, "Please try to /JOIN a channel first");
+            main_view.add_error(main_view.buffer, JOIN_STRING);
             input.set_text("");
             return;
         }
