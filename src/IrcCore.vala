@@ -88,6 +88,8 @@ public struct ServerInfo {
     int nick_length;
     int topic_length;
     string network;
+    bool monitor; /**<Whether the ircd supports the monitor (ircv3) extension*/
+    int monitor_max;
 }
 
 const string TLS_BANNER = """
@@ -124,6 +126,14 @@ public class IrcCore : Object
     public signal void parted_channel(IrcUser user, string channel, string? reason);
 
     public signal void connecting(IrcConnectionStatus status, string host, int port, string message);
+
+    /**
+     * Emitted when a known extension is enabled
+     */
+    public signal void extension_enabled(string extension);
+
+    public signal void user_online(IrcUser user);
+    public signal void user_offline(IrcUser user);
 
     /* All this is to ensure we perform valid non-blocking queued output. Phew. */
     private Queue<string> out_q;
@@ -658,11 +668,29 @@ public class IrcCore : Object
                         case "TOPICLEN":
                             sinfo.topic_length = int.parse(val);
                             break;
+                        case "MONITOR":
+                            sinfo.monitor = true;
+                            sinfo.monitor_max = int.parse(val);
+                            extension_enabled(key);
+                            break;
                         default:
                             break;
                     }
                 }
                 server_info(this.sinfo);
+                break;
+            case IRC.RPL_MONONLINE:
+            case IRC.RPL_MONOFFLINE:
+                string msg;
+                parse_simple(sender, remnant, null, null, out msg);
+                foreach (var u in msg.strip().split(",")) {
+                    var user = user_from_hostmask(u);
+                    if (numeric == IRC.RPL_MONONLINE) {
+                        user_online(user);
+                    } else {
+                        user_offline(user);
+                    }
+                }
                 break;
             /* Names handling.. */
             case IRC.RPL_NAMREPLY:
@@ -1109,6 +1137,23 @@ public class IrcCore : Object
         string msgtype = notice ? "NOTICE" : "PRIVMSG";
 
         write_socket(@"%s %s :$(CTCP_PREFIX)%s$(CTCP_PREFIX)\r\n", msgtype, target, cmd);
+    }
+
+    public void add_monitor(string target)
+    {
+        if (!sinfo.monitor) {
+            warning("Server does not support MONITOR extension");
+            return;
+        }
+        write_socket("MONITOR + %s\r\n", target);
+    }
+
+    public void remove_monitor(string target)
+    {
+        if (!sinfo.monitor) {
+            warning("Server does not support MONITOR extension");
+        }
+        write_socket("MONITOR - %s\r\n", target);
     }
 
     /**

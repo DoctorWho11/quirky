@@ -34,6 +34,13 @@ public enum IRC {
     TLS_BEGIN = 670,
     TLS_FAIL = 691,
 
+    /** Monitor extension */
+    RPL_MONONLINE = 730,
+    RPL_MONOFFLINE = 731,
+    RPL_MONLIST = 732,
+    RPL_ENDOFMONLIST = 733,
+    ERR_MONLISTISFULL = 734,
+
     /* SASL auth */
     RPL_LOGGEDIN = 900,
     RPL_LOGGEDOUT = 901,

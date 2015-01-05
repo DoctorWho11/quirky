@@ -41,6 +41,15 @@ public class DummyBot
             irc.join_channel(default_channel);
             irc.send_names("#evolveos");
         });
+        irc.extension_enabled.connect((e)=> {
+            irc.add_monitor("ikey");
+        });
+        irc.user_online.connect((u)=> {
+            stdout.printf("%s is online\n", u.nick);
+        });
+        irc.user_offline.connect((u)=> {
+            stdout.printf("%s is offline\n", u.nick);
+        });
 
         irc.messaged.connect(on_messaged);
 
@@ -143,7 +152,7 @@ public class DummyBot
     
     public void run_bot()
     {
-        irc.connect.begin("localhost", 6667, false, false, ()=> {
+        irc.connect.begin("localhost", 6697, true, false, ()=> {
             stdout.printf("Loop quit\n");
             loop.quit();
         });
