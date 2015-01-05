@@ -140,6 +140,7 @@ public class IrcCore : Object
     private string[] cap_requests;
     private string[] cap_denied;
     private string[] cap_granted;
+    private bool to_tls = false;
 
     const unichar CTCP_PREFIX = '\x01';
 
@@ -590,8 +591,11 @@ public class IrcCore : Object
             case IRC.RPL_LOGGEDIN:
                 message("SASL auth success");
                 write_socket("CAP END\r\n");
+                if (to_tls) {
+                    write_socket("STARTTLS\r\n");
+                    to_tls = false;
+                }
                 break;
-
             case IRC.ERR_NICKLOCKED:
             case IRC.ERR_SASLFAIL:
             case IRC.ERR_SASLTOOLONG:
@@ -600,6 +604,10 @@ public class IrcCore : Object
                 /* SASL failed, basically. */
                 warning("SASL authentication failed with numeric: %d", numeric);
                 write_socket("CAP END\r\n");
+                if (to_tls) {
+                    write_socket("STARTTLS\r\n");
+                    to_tls = false;
+                }
                 break;
             /* Server info parsing, goodie! */
             case IRC.RPL_ISUPPORT:
@@ -802,11 +810,12 @@ public class IrcCore : Object
                 string msg;
                 string[] params;
                 parse_simple(sender, remnant, null, out params, out msg);
+
+                /* currently we don't support dynamic (post-reg) changes */
                 if (params[1] == "LS") {
                     /* CAP LS response */
                     msg = msg.strip();
                     capabilities = msg.split(" ");
-
                     /** Note, we don't actually request any CAPS yet. */
 
                     if (cap_requests.length > 0) {
@@ -829,12 +838,23 @@ public class IrcCore : Object
                         cap_denied += nack;
                     }
                 }
+
+                /* If we req'd and ack'd tls, schedule starttls. */
+                if ("tls" in cap_granted && "tls" in cap_requests) {
+                    to_tls = true;
+                }
+
                 if (cap_requests.length == cap_denied.length + cap_granted.length) {
                     /* Permit completion of SASL auth */
                     if (!("sasl" in cap_granted)) {
                         write_socket("CAP END\r\n");
+                        if (to_tls) {
+                            write_socket("STARTTLS\r\n");
+                            to_tls = false;
+                        }
                     }
                 }
+
                 /* Deal with SASL auth. */
                 if ("sasl" in cap_granted) {
                     /* For now we only support PLAIN */
