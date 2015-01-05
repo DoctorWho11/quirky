@@ -463,7 +463,32 @@ window.
             max_params = 1,
             server = true
         };
-
+        commands["help"] = Command() {
+            cb = (line)=> {
+                if (line == null) {
+                    /* Display all help topics.. */
+                    main_view.add_info(main_view.buffer, "");
+                    main_view.add_info(main_view.buffer, "For info on a given command, type /HELP [command]. Available commands are:");
+                    main_view.add_info(main_view.buffer, "");
+                    commands.foreach((k,v)=> {
+                        main_view.add_info(main_view.buffer, "\u2022 %s", k);
+                    });
+                    main_view.add_info(main_view.buffer, "");
+                } else {
+                    main_view.add_info(main_view.buffer, "");
+                    if (!(line in commands)) {
+                        main_view.add_info(main_view.buffer, "%s: Unknown command. Type /HELP for a list of commands.", line);
+                    } else {
+                        main_view.add_info(main_view.buffer, "%s", template(commands[line].help, line));
+                    }
+                }
+            },
+            help = "%s - Display help",
+            min_params = 0,
+            max_params = -1,
+            server = true,
+            offline = true
+        };
         /* actions.. */
         var btn = new Gtk.MenuButton();
         btn.margin_left = 6;
@@ -912,7 +937,7 @@ window.
      */
     string template(string input, string cmd)
     {
-        var t = input.replace("%C", cmd);
+        var t = input.replace("%C", cmd.up());
         return t;
     }
 

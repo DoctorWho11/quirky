@@ -422,7 +422,7 @@ public class IrcTextWidget : Gtk.TextView
             buf.insert_with_tags_by_name(i, @"\t* $(whom) ", -1, "nickname", get_nick_color(whom), "action", "default");
         } else if (ttype == IrcTextType.QUIT) {
             buf.insert_with_tags_by_name(i, @"\t$(whom) ", -1, "nickname", get_nick_color(whom), "default");
-        } else if (ttype == IrcTextType.JOIN || ttype == IrcTextType.PART || ttype == IrcTextType.ERROR || ttype == IrcTextType.INFO) {
+        } else if (ttype == IrcTextType.JOIN || ttype == IrcTextType.PART || ttype == IrcTextType.ERROR) {
             buf.insert_with_tags_by_name(i, @"\t* ", -1, "default");
             if (whom != "") {
                 buf.get_end_iter(out i);
