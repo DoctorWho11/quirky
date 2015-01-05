@@ -79,6 +79,25 @@ public class SidebarItem : Gtk.EventBox
         }
     }
 
+    /**
+     * "Usable" state, visually different for parted channels, etc.
+     */
+    private bool _usable;
+    public bool usable {
+        public set {
+            if (value) {
+                get_style_context().remove_class("dim-label");
+            } else {
+                get_style_context().add_class("dim-label");
+            }
+            _usable = usable;
+        }
+        public get {
+            return _usable;
+        }
+        default = true;
+    }
+
     public new signal void activated();
 
     public SidebarItem(string label, string icon)
@@ -165,6 +184,25 @@ public class SidebarExpandable : Gtk.Box
         public get {
             return _selected;
         }
+    }
+
+    /**
+     * "Usable" state, visually different for disconnected servers, etc.
+     */
+    private bool _usable;
+    public bool usable {
+        public set {
+            if (value) {
+                get_style_context().remove_class("dim-label");
+            } else {
+                get_style_context().add_class("dim-label");
+            }
+            _usable = usable;
+        }
+        public get {
+            return _usable;
+        }
+        default = true;
     }
 
     public signal void clicked();
