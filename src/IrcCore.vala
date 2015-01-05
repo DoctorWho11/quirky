@@ -932,6 +932,17 @@ public class IrcCore : Object
     }
 
     /**
+     * Part the given channel with an optional reason.
+     * 
+     * @param channel The channel to leave
+     * @param reason The reason for leaving
+     */
+    public void part_channel(string channel, string? reason)
+    {
+        write_socket("PART %s%s\r\n", channel, reason != null ? " :" + reason :  "");
+    }
+
+    /**
      * Send a message to the target
      *
      * @param target An online IRC nick, or a joined IRC channel

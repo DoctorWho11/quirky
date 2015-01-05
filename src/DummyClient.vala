@@ -167,28 +167,37 @@ window.
         core.joined_channel.connect((u,c)=> {
             update_actions();
             if (u.nick == core.ident.nick) {
-                var root = roots[core];
-                var item = root.add_item(c, "user-available-symbolic");
-                item.set_data("icore", core);
-                item.set_data("ichannel", c);
-                var tbuf = get_named_buffer(core, c);
-                tbuf.set_data("sitem", item); // Maybe its time to subclass TextBuffer :p
-                item.activated.connect(()=> {
-                    var buf = get_named_buffer(core, c);
-                    this.core = item.get_data("icore");
-                    this.target = item.get_data("ichannel");
-                    set_buffer(buf);
-                    update_actions();
-                    update_nick(core);
-                    /* select appropriate nicklist.. */
-                    var nlist = get_nicklist(core, this.target, false);
-                    nick_list.set_model(nlist);
-                    nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
-                    nick_reveal.set_reveal_child(true);
-                });
+                /* If we have a buffer here, reuse it. */
+                var buf = get_named_buffer(core, c, false);
+                SidebarExpandable? root = roots[core];
+                SidebarItem? item;
+                if (buf == null) {
+                    item = root.add_item(c, "user-available-symbolic");
+                    item.set_data("icore", core);
+                    item.set_data("ichannel", c);
+                    var tbuf = get_named_buffer(core, c);
+                    tbuf.set_data("sitem", item); // Maybe its time to subclass TextBuffer :p
+                    item.activated.connect(()=> {
+                        var nbuf = get_named_buffer(core, c);
+                        this.core = item.get_data("icore");
+                        this.target = item.get_data("ichannel");
+                        set_buffer(nbuf);
+                        update_actions();
+                        update_nick(core);
+                        /* select appropriate nicklist.. */
+                        var nlist = get_nicklist(core, this.target, false);
+                        nick_list.set_model(nlist);
+                        nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
+                        nick_reveal.set_reveal_child(true);
+                    });
+                    buf = tbuf;
+                } else {
+                    buf = get_named_buffer(core, c, false);
+                    item = buf.get_data("sitem");
+                    item.usable = true;
+                }
                 root.set_expanded(true);
                 root.select_item(item);
-                var buf = get_named_buffer(core, c); /* do nothing :P */
                 main_view.add_message(buf, "", @"You have joined $(c)", IrcTextType.JOIN);
             } else {
                 var buf = get_named_buffer(core, c); /* do nothing :P */
@@ -285,13 +294,16 @@ window.
         return ret;
     }
 
-    private unowned Gtk.TextBuffer get_named_buffer(IrcCore c, string name)
+    private unowned Gtk.TextBuffer? get_named_buffer(IrcCore c, string name, bool create = true)
     {
         string compname = @"$(c.id)$(name)";
         Gtk.TextBuffer? buf;
         if (compname in buffers) {
             buf = buffers[compname];
         } else {
+            if (!create) {
+                return null;
+            }
             buf = new Gtk.TextBuffer(main_view.tags);
             buffers[compname] = buf;
         }
@@ -399,6 +411,29 @@ window.
             help = "%C <user>, start a query with a user",
             min_params = 1,
             max_params = 1,
+            server = true
+        };
+        /* Part from a channel */
+        commands["part"] = Command() {
+            cb = (line)=> {
+                if (line == null) {
+                    if (this.target == null) {
+                        warning("CRAQMONKIES");
+                    }
+                    /* Current channel. (no default part message yet) */
+                    core.part_channel(this.target, null);
+                } else {
+                    var splits = line.strip().split(" ");
+                    if (splits.length == 1) {
+                        core.part_channel(splits[0], null);
+                    } else {
+                        core.part_channel(splits[0], string.joinv(" ", splits[1:splits.length]));
+                    }
+                }
+            },
+            help = "%C [channel] [reason], leave a given channel with an optional reason, or the current one",
+            min_params = 0,
+            max_params = -1,
             server = true
         };
 
