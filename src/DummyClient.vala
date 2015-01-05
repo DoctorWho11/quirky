@@ -153,7 +153,7 @@ window.
             }
         });
 
-        core.connect.begin(host, port, ssl);
+        core.connect.begin(host, port, ssl, false); /* Currently not a UI option */
         core.messaged.connect(on_messaged);
         core.established.connect(()=> {
             string aj = core.get_data("autojoin");
