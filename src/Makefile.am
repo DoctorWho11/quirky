@@ -1,5 +1,22 @@
 EXTRA_DIST = 
 
+client_resources = $(shell glib-compile-resources --sourcedir=$(top_srcdir)/data --generate-dependencies $(top_srcdir)/data/client-resources.gresource.xml)
+
+BUILT_SOURCES = \
+	client-resources.h \
+	client-resources.c
+
+CLEANFILES = \
+	$(BUILT_SOURCES)
+
+# resources
+client-resources.h: $(top_srcdir)/data/client-resources.gresource.xml $(client_resources)
+	glib-compile-resources --target=$@ --sourcedir=$(top_srcdir)/data --generate-header --c-name client_resources $<
+
+client-resources.c: $(top_srcdir)/data/client-resources.gresource.xml $(client_resources)
+	glib-compile-resources --target=$@ --sourcedir=$(top_srcdir)/data --generate-source --c-name client_resources $<
+
+
 bin_PROGRAMS = \
 	dummy-bot \
 	dummy-client
@@ -18,19 +35,12 @@ dummy_bot_LDADD = \
 	$(GIO_LIBS)
 
 dummy_bot_VALAFLAGS = \
-	$(VALAFLAGS)
-
-
-if BUILD_WINDOWS
-	dummy_bot_CFLAGS += $(GIO_WINDOWS_CFLAGS)
-	dummy_bot_LDADD += $(GIO_WINDOWS_LIBS)
-else
-	dummy_bot_CFLAGS += $(GIO_UNIX_CFLAGS)
-	dummy_bot_LDADD += $(GIO_UNIX_LIBS)
-endif
-
+	$(VALAFLAGS) \
+	--pkg gio-2.0
 
 dummy_client_SOURCES = \
+	client-resources.h \
+	client-resources.c \
 	IrcConstants.vala \
 	IrcCore.vala \
 	IrcTextWidget.vala \
@@ -49,12 +59,5 @@ dummy_client_LDADD = \
 
 dummy_client_VALAFLAGS = \
 	--pkg gtk+-3.0 \
+	--pkg gio-2.0 \
 	$(VALAFLAGS)
-
-if BUILD_WINDOWS
-	dummy_client_CFLAGS += $(GIO_WINDOWS_CFLAGS)
-	dummy_client_LDADD += $(GIO_WINDOWS_LIBS)
-else
-	dummy_client_CFLAGS += $(GIO_UNIX_CFLAGS)
-	dummy_client_LDADD += $(GIO_UNIX_LIBS)
-endif
