@@ -367,6 +367,7 @@ public class IrcCore : Object
             message("TLS failure %s", e.message);
             tls_pending = false;
             disconnect();
+            return;
         }
         tls.set_use_ssl3(false);
         tls.accept_certificate.connect(this.accept_certificate);
@@ -381,6 +382,7 @@ public class IrcCore : Object
         if (!success) {
             tls_pending = false;
             disconnect();
+            return;
         }
         cancel.reset();
         setup_io();
