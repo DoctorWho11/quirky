@@ -296,11 +296,6 @@ public class IrcCore : Object
             /* Attempt identification immediately, get the ball rolling */
             connecting(IrcConnectionStatus.REGISTERING, addr.to_string(), (int)port, "Logging in...");
 
-            /**
-             * Request capabilities immediately..
-             */
-            write_socket("CAP LS\r\n");
-
             /* Send TLS immediately..
              * If a server doesn't support this we'll end up with a registration
              * timeout. Better to use CAP in future :)
@@ -363,6 +358,7 @@ public class IrcCore : Object
         if (tls_pending) {
             return;
         }
+        write_socket("CAP LS\r\n");
         write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
         write_socket("NICK %s\r\n", ident.nick);
         registered = true;
