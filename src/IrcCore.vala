@@ -90,6 +90,12 @@ public struct ServerInfo {
     string network;
 }
 
+const string TLS_BANNER = """
+@@@@ WARNING @@@@
+STARTTLS negotiation failed, this is *still* a plaintext connection!!!
+@@@@         @@@@
+""";
+
 private struct _olock { int x; }
 
 public class IrcCore : Object
@@ -125,6 +131,10 @@ public class IrcCore : Object
     private _olock outm;
     private IOChannel ioc;
     private DataOutputStream dos;
+
+    bool registered = false;
+    InetSocketAddress sock_addr;
+    bool tls_pending = false;
 
     const unichar CTCP_PREFIX = '\x01';
 
@@ -249,7 +259,7 @@ public class IrcCore : Object
         return true;
     }
 
-    public new async void connect(string host, uint16 port, bool use_ssl)
+    public new async void connect(string host, uint16 port, bool use_ssl, bool starttls)
     {
         try {
             var r = Resolver.get_default();
@@ -258,7 +268,7 @@ public class IrcCore : Object
             var addresses = yield r.lookup_by_name_async(host, cancel);
             var addr = addresses.nth_data(0);
 
-            var sock_addr = new InetSocketAddress(addr, port);
+            sock_addr = new InetSocketAddress(addr, port);
             var client = new SocketClient();
 
             /* Attempt ssl :o */
@@ -276,24 +286,44 @@ public class IrcCore : Object
                 this.client = client;
             }
             connection.socket.set_blocking(false);
-            var dis = new DataInputStream(connection.input_stream);
-            dos = new DataOutputStream(connection.output_stream);
-#if WINDOWSBUILD
-            ioc = new IOChannel.win32_socket(connection.socket.fd);
-#else
-            ioc = new IOChannel.unix_new(connection.socket.fd);
-#endif
 
+            setup_io();
             /* Attempt identification immediately, get the ball rolling */
             connecting(IrcConnectionStatus.REGISTERING, addr.to_string(), (int)port, "Logging in...");
 
-            write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
-            write_socket("NICK %s\r\n", ident.nick);
+            /* Send TLS immediately..
+             * If a server doesn't support this we'll end up with a registration
+             * timeout. Better to use CAP in future :)
+             */
+            if (starttls && !use_ssl) {
+                write_socket("STARTTLS\r\n");
+                tls_pending = true;
+            }
+            yield _irc_loop();
+        } catch (Error e) {
+            message(e.message);
+            if (!cancel.is_cancelled()) {
+                cancel.cancel();
+            }
+            disconnect();
+        }
+    }
 
+    /**
+     * Main IRC loop
+     */
+    async void _irc_loop()
+    {
+        try {
+            InputStream? stream = tls != null ? tls.get_input_stream() : conn.input_stream;
+            var dis = new DataInputStream(stream);
             /* Now we loop. */
             string line = null;
             while ((line = yield dis.read_line_async(Priority.DEFAULT, cancel)) != null) {
                 yield handle_line(line);
+                if (!registered) {
+                    register();
+                }
             }
         } catch (Error e) {
             message(e.message);
@@ -304,8 +334,73 @@ public class IrcCore : Object
         }
     }
 
+    void setup_io()
+    {
+        OutputStream? output = tls != null  ? tls.get_output_stream() : conn.output_stream;
+
+        dos = new DataOutputStream(output);
+        dos.set_close_base_stream(false);
+#if WINDOWSBUILD
+        ioc = new IOChannel.win32_socket(conn.socket.fd);
+#else
+        ioc = new IOChannel.unix_new(conn.socket.fd);
+#endif
+    }
+
+    void register()
+    {
+        /* Prevent early registration with TLS enabled */
+        if (tls_pending) {
+            return;
+        }
+        write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
+        write_socket("NICK %s\r\n", ident.nick);
+        registered = true;
+    }
+
+    TlsClientConnection? tls;
+
+    async void setup_tls() {
+        try {
+            tls = TlsClientConnection.new(this.conn, this.sock_addr);
+        } catch (Error e) {
+            message("TLS failure %s", e.message);
+            tls_pending = false;
+            disconnect();
+        }
+        tls.set_use_ssl3(false);
+        tls.accept_certificate.connect(this.accept_certificate);
+        /* Stop everyone from reading. */
+        cancel.cancel();
+        bool success = false;
+        try {
+            success = yield tls.handshake_async(Priority.DEFAULT, null);
+        } catch (Error e) {
+            warning("TLS handshake failure: %s", e.message);
+        }
+        if (!success) {
+            tls_pending = false;
+            disconnect();
+        }
+        cancel.reset();
+        setup_io();
+        tls_pending = false;
+        yield _irc_loop();
+    }
+
+    /**
+     * Accepts all certificates right now, v. bad!
+     */
+    bool accept_certificate(TlsCertificate cert, TlsCertificateFlags flags)
+    {
+        return true;
+    }
+
     public new void disconnect()
     {
+        if (!tls_pending) {
+            return;
+        }
         try {
             if(!cancel.is_cancelled()) {
                 cancel.cancel();
@@ -327,9 +422,7 @@ public class IrcCore : Object
             message("Handshaking..");
             var t = con as TlsClientConnection;
             t.set_use_ssl3(false);
-            t.accept_certificate.connect((c,e)=> {
-                return true;
-            });
+            t.accept_certificate.connect(accept_certificate);
         } else if (e == SocketClientEvent.TLS_HANDSHAKED) {
             message("Handshake complete");
         }
@@ -478,7 +571,12 @@ public class IrcCore : Object
                 ident.nick = params[0];
                 established();
                 break;
-
+            case IRC.TLS_BEGIN:
+                yield setup_tls();
+                break;
+            case IRC.TLS_FAIL:
+                warning(TLS_BANNER);
+                break;
             /* Server info parsing, goodie! */
             case IRC.RPL_ISUPPORT:
                 string[] params;

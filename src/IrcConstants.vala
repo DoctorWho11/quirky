@@ -28,5 +28,9 @@ public enum IRC {
 
     RPL_MOTDSTART = 375, /* Message-of-the-day (start) */
     RPL_MOTD = 372, /* Message-of-the-day (content) */
-    RPL_ENDOFMOTD = 376 /* Message-of-the-day (end) */
+    RPL_ENDOFMOTD = 376, /* Message-of-the-day (end) */
+
+    /* Not really official constants but meh. */
+    TLS_BEGIN = 670,
+    TLS_FAIL = 691
 }
