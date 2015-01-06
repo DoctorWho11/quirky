@@ -21,6 +21,12 @@ public class MCS {
     public static const unichar RESET = '\x0F';
 }
 
+struct TmpIter {
+    int start;
+    int end;
+    string tag;
+}
+
 /**
  * Custom Entry enabling input of special control chars..
  */
@@ -338,8 +344,6 @@ public class IrcTextWidget : Gtk.TextView
         string last_nick = buf.get_data("_lastnick");
         string[] lines = {};
 
-        Gtk.TextIter i;
-        buf.get_end_iter(out i);
         insert_timestamp(buf);
 
         if (whom == null) {
@@ -358,63 +362,95 @@ public class IrcTextWidget : Gtk.TextView
 
 
         lines = _print_formatted(format, va);
-
         foreach (var message in lines) {
-            buf.get_end_iter(out i);
-            int msg_start = i.get_offset();
+            unichar n;
 
-            /* Manual handling of string.. */
-            bool bolding = false;
-            bool italic = false;
+            StringBuilder b = new StringBuilder();
+            TmpIter[] iters = {};
+
+            /* Handle colours later.. */
+            bool bold  = false;
             bool underline = false;
+            bool italic = false;
 
-            List<string> styles = new List<string>();
-            styles.append("default");
+            TmpIter b_tmp = TmpIter();
+            TmpIter i_tmp = TmpIter();
+            TmpIter u_tmp = TmpIter();
+            TmpIter c_tmpb = TmpIter();
+            TmpIter c_tmpf = TmpIter();
 
-            for (int j=0; j < message.length; j++) {
-                unichar c = message.get_char(j);
-                bool skip = true;
+            for (int i = 0, r=0; i < message.length; i++) {
+                unichar c = message.get_char(i);
                 switch (c) {
                     case MCS.BOLD:
-                        if (bolding) {
-                            styles.remove(styles.find_custom("mbold", strcmp).data);
+                        if (!bold) {
+                            b_tmp = TmpIter();
+                            b_tmp.tag = "mbold";
+                            b_tmp.start = r;
                         } else {
-                            styles.append("mbold");
+                            b_tmp.end = r;
+                            iters += b_tmp;
                         }
-                        bolding = !bolding;
+                        bold = !bold;
                         break;
-                    case MCS.ITALIC:
-                        if (italic) {
-                            styles.remove(styles.find_custom("mitalic", strcmp).data);
-                        } else {
-                            styles.append("mitalic");
+                    case MCS.RESET:
+                        if (underline) {
+                            u_tmp.end = r;
+                            underline = false;
+                            iters += u_tmp;
                         }
-                        italic = !italic;
+                        if (bold) {
+                            b_tmp.end = r;
+                            bold = false;
+                            iters += b_tmp;
+                        }
+                        if (italic) {
+                            i_tmp.end = r;
+                            italic = false;
+                            iters += i_tmp;
+                        }
+                        if (c_tmpf.tag != null) {
+                            c_tmpf.end = r;
+                            iters += c_tmpf;
+                            c_tmpf.tag = null;
+                        }
+                        if (c_tmpb.tag != null) {
+                            c_tmpb.end = r;
+                            iters += c_tmpb;
+                            c_tmpb.tag = null;
+                        }
                         break;
                     case MCS.UNDERLINE:
-                        if (underline) {
-                            styles.remove(styles.find_custom("munderline", strcmp).data);
+                        if (!underline) {
+                            u_tmp = TmpIter();
+                            u_tmp.tag = "munderline";
+                            u_tmp.start = r;
                         } else {
-                            styles.append("munderline");
+                            u_tmp.end = r;
+                            iters += u_tmp;
                         }
                         underline = !underline;
                         break;
-                    case MCS.RESET:
-                        bolding = false;
-                        italic = false;
-                        underline = false;
-                        styles = new List<string>();
-                        styles.append("default");
+                    case MCS.ITALIC:
+                        if (!italic) {
+                            i_tmp = TmpIter();
+                            i_tmp.tag = "mitalic";
+                            i_tmp.start = r;
+                        } else {
+                            i_tmp.end = r;
+                            iters += i_tmp;
+                        }
+                        italic = !italic;
                         break;
                     case MCS.COLOR:
                         StringBuilder tbuf = new StringBuilder();
-                        int k = j;
-                        int sk = j;
+                        int k = i;
+                        int sk = i;
                         bool comma = false;
                         int lside = 0;
                         int rside = 0;
                         if (k+1 < message.length) {
-                            for (k = j+1; k < message.length; k++) {
+                            for (k = i+1; k < message.length; k++) {
                                 c = message.get_char(k);
                                 if (c.isdigit()) {
                                     if (!comma) {
@@ -441,18 +477,20 @@ public class IrcTextWidget : Gtk.TextView
                                 }
                                 tbuf.append_unichar(c);
                             }
-                            j = k;
+                            i = k;
                         }
-                        if (tbuf.str.length == 0) {
-                            /* Ugly as shit but that's what happens when we you used linked lists.. */
-                            var  blist = styles.copy();
-                            foreach (var st in blist) {
-                                if (st.has_prefix("m_") || st.has_prefix("mb_")) {
-                                    styles.remove(st);
-                                }
+                        if (tbuf.str.strip().length == 0) {
+                            /* color reset.. */
+                            if (c_tmpb.tag != null) {
+                                c_tmpb.end = r;
+                                iters += c_tmpb;
+                                c_tmpb.tag = null;
                             }
-                            blist = null;
-                            k = sk;
+                            if (c_tmpf.tag != null) {
+                                c_tmpf.end = r;
+                                iters += c_tmpf;
+                                c_tmpf.tag = null;
+                            }
                             break;
                         }
                         int fg_index = -1;
@@ -464,44 +502,97 @@ public class IrcTextWidget : Gtk.TextView
                         } else {
                             fg_index = int.parse(tbuf.str);
                         }
+
                         if (fg_index == 30) {
                             fg_index = get_nick_color(whom);
                         }
-
-                        if (fg_index in mcols) {
-                            styles.append("m_" + mcols[fg_index]);
+                        if (fg_index > 0) {
+                            fg_index = fg_index % (int)mcols.size();
                         }
-                        if (bg_index in mcols) {
-                            styles.append("mb_" + mcols[bg_index]);
+                        if (bg_index > 0) {
+                            bg_index = bg_index % (int)mcols.size();
+                        }
+                        /* Got old colour ? */
+                        if (c_tmpf.tag != null) {
+                            c_tmpf.end = r;
+                            /* same colour again = reset */
+                            iters += c_tmpf;
+                            if (c_tmpf.tag == "m_" + mcols[fg_index]) {
+                                c_tmpf.tag = null;
+                                break;
+                            }
+                            c_tmpf.tag = null;
+                        }
+                        if (c_tmpb.tag != null) {
+                            c_tmpb.end = r;
+                            /* same colour again = reset */
+                            iters += c_tmpb;
+                            if (c_tmpb.tag == "mb_" + mcols[fg_index]) {
+                                c_tmpb.tag = null;
+                                break;
+                            }
+                            c_tmpb.tag = null;
+                        }
+
+
+                        if (fg_index >= 0) {
+                            c_tmpf.start = r;
+                            c_tmpf.tag = "m_" + mcols[fg_index % (int)mcols.size()];
+                        }
+                        if (bg_index >= 0) {
+                            c_tmpb.start = r;
+                            c_tmpb.tag = "mb_" + mcols[bg_index % (int)mcols.size()];
                         }
                         break;
                     default:
-                        /* Not arsed. */
-                        skip = false;
+                        ++r;
+                        b.append_unichar(c);
                         break;
                 }
-                if (!skip) {
-                    buf.get_end_iter(out i);
-                    var offset = i.get_offset();
-                    Gtk.TextIter s;
-                    buf.insert(ref i, c.to_string(), 1);
-                    buf.get_iter_at_offset(out s, offset);
-                    foreach (var st in styles) {
-                        buf.apply_tag_by_name(st, s, i);
-                    }
-                }
             }
-            buf.get_end_iter(out i);
-            buf.insert_with_tags_by_name(i, "\n", -1, "default");
+            /* claim unfinished iters */
+            if (bold) {
+                iters += b_tmp;
+            }
+            if (italic) {
+                iters += i_tmp;
+            }
+            if (underline) {
+                iters += u_tmp;
+            }
+            if (c_tmpf.tag != null) {
+                iters += c_tmpf;
+            }
+            if (c_tmpb.tag != null) {
+                iters += c_tmpb;
+            }
+            Gtk.TextIter it;
+            Gtk.TextIter et;
+            buf.get_end_iter(out it);
+            int start = it.get_offset();
+
+            buf.insert_with_tags_by_name(it, b.str, -1, "default");
+            buf.get_end_iter(out it);
+            int end = it.get_offset();
+
+            foreach (var iter in iters) {
+                buf.get_iter_at_offset(out it, start+iter.start);
+                buf.get_iter_at_offset(out et, iter.end <= iter.start ? end : start+iter.end);
+                buf.apply_tag_by_name(iter.tag, it, et);
+            }
+
+            iters = null;
+            buf.get_end_iter(out it);
+            buf.insert_with_tags_by_name(it, "\n", -1, "default");
   
-            /* Process URLs */
-            var urls = get_urls(demirc(message));
+            /* Process URLs (string sanitised by prior mirc run. */
+            var urls = get_urls(b.str);
             if (urls.length > 0) {
                 foreach (var url in urls) {
                     Gtk.TextIter s;
                     Gtk.TextIter e;
-                    buf.get_iter_at_offset(out s, msg_start+url.start);
-                    buf.get_iter_at_offset(out e, msg_start+url.start+url.url.length);
+                    buf.get_iter_at_offset(out s, start+url.start);
+                    buf.get_iter_at_offset(out e, start+url.start+url.url.length);
                     var tag = buf.create_tag(null);
                     tag.set_data("_uri", url.url);
                     buf.apply_tag_by_name("url", s, e);
