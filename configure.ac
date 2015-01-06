@@ -35,6 +35,7 @@ AC_PATH_PROG(GLIB_COMPILE_RESOURCES, glib-compile-resources)
 AM_PROG_VALAC([0.24], [], [AC_MSG_ERROR([valac is required to build vacation-project])])
 
 AC_CONFIG_FILES([Makefile
+                 data/Makefile
                  src/Makefile])
 AC_OUTPUT
 

@@ -1,11 +1,13 @@
 ACLOCAL_AMFLAGS = -I m4
 AM_CFLAGS =
 
-EXTRA_DIST = ${top_srcdir}/README.md \
-	     ${top_srcdir}/LICENSE
+EXTRA_DIST = \
+	${top_srcdir}/README.md \
+	${top_srcdir}/LICENSE
 
 NULL =
 CLEANFILES =
 
 SUBDIRS = \
+	data \
 	src
