@@ -1,5 +1,12 @@
-Hacking around on vacation - ignore, I guess! :)
+Quirky IRC Client
 
-- ikey
+Currently under heavy development!
 
-"Let's not stand on ceremony here, Mr. Wayne.."
+License
+------
+
+GPLv2
+
+Authors
+-------
+ * Ikey Doherty <ikey@evolve-os.com>

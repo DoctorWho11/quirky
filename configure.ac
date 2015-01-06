@@ -1,4 +1,4 @@
-AC_INIT([Vacation Project], 1, [ikey@evolve-os.com], [vacation-project], [https://evolve-os.com/])
+AC_INIT([Quirky IRC Client], 1, [ikey@evolve-os.com], [quirky], [https://evolve-os.com/])
 AM_INIT_AUTOMAKE([-Wno-portability no-dist-gzip dist-xz foreign subdir-objects])
 AC_PROG_CC
 AC_PROG_CC_STDC
@@ -32,7 +32,7 @@ AC_SUBST(VALAFLAGS)
 AC_PATH_PROG(GLIB_COMPILE_RESOURCES, glib-compile-resources)
 
 # Need Vala.
-AM_PROG_VALAC([0.24], [], [AC_MSG_ERROR([valac is required to build vacation-project])])
+AM_PROG_VALAC([0.24], [], [AC_MSG_ERROR([valac is required to build Quirky])])
 
 AC_CONFIG_FILES([Makefile
                  data/Makefile
@@ -40,7 +40,7 @@ AC_CONFIG_FILES([Makefile
 AC_OUTPUT
 
 AC_MSG_RESULT([
-        vacation-project $VERSION
+        quirky $VERSION
         ========
 
         prefix:                 ${prefix}
