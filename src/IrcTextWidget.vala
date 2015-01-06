@@ -653,7 +653,7 @@ public class IrcTextWidget : Gtk.TextView
                         if (index < 0 || index > opts.length) {
                             warning("Format string requested invalid index %d: %s", index, fmt);
                             b.append("null");
-                            continue;
+                            break;
                         }
                         string replace = opts[index-1];
                         b.append(replace);
