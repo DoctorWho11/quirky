@@ -19,7 +19,7 @@ client-resources.c: $(top_srcdir)/data/client-resources.gresource.xml $(client_r
 
 bin_PROGRAMS = \
 	dummy-bot \
-	dummy-client
+	quirky
 
 dummy_bot_SOURCES = \
 	IrcConstants.vala \
@@ -38,7 +38,7 @@ dummy_bot_VALAFLAGS = \
 	$(VALAFLAGS) \
 	--pkg gio-2.0
 
-dummy_client_SOURCES = \
+quirky_SOURCES = \
 	client-resources.h \
 	client-resources.c \
 	IrcConstants.vala \
@@ -46,19 +46,19 @@ dummy_client_SOURCES = \
 	IrcTextWidget.vala \
 	Messages.vala \
 	Widgets.vala \
-	DummyClient.vala
+	QuirkyClient.vala
 
-dummy_client_CFLAGS = \
+quirky_CFLAGS = \
 	$(GOBJECT_CFLAGS) \
 	$(GIO_CFLAGS) \
 	$(GTK_CFLAGS)
 
-dummy_client_LDADD = \
+quirky_LDADD = \
 	$(GOBJECT_LIBS) \
 	$(GIO_LIBS) \
 	$(GTK_LIBS)
 
-dummy_client_VALAFLAGS = \
+quirky_VALAFLAGS = \
 	--pkg gtk+-3.0 \
 	--pkg gio-2.0 \
 	$(VALAFLAGS)

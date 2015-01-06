@@ -1,5 +1,5 @@
 /*
- * DummyClient.vala
+ * QuirkyClient.vala
  * 
  * Copyright 2014 Ikey Doherty <ikey@evolve-os.com>
  * 
@@ -30,7 +30,7 @@ struct Command {
 /**
  * Main client GUI
  */
-public class DummyClient : Gtk.ApplicationWindow
+public class QuirkyClient : Gtk.ApplicationWindow
 {
     Gtk.HeaderBar header;
     IrcTextEntry input;
@@ -442,7 +442,7 @@ window.
         main_view.add_message(buf, null, _M(MSG.INFO), fmt.vprintf(va));
     }
 
-    public DummyClient(Gtk.Application application)
+    public QuirkyClient(Gtk.Application application)
     {
         Object(application: application);
 
@@ -451,9 +451,9 @@ window.
 
         header = new Gtk.HeaderBar();
         header.set_show_close_button(true);
-        set_title("DummyClient");
+        set_title("Quirky");
         set_titlebar(header);
-        header.set_title("DummyClient");
+        header.set_title("Quirky");
 
         main_view = new IrcTextWidget();
 
@@ -905,9 +905,9 @@ window.
         var dlg = new ConnectDialog(this);
         if (dlg.run() == Gtk.ResponseType.OK) {
             IrcIdentity ident = IrcIdentity() {
-                nick = "ikeytestclient", /* Backup */
-                username = "dummyclient",
-                gecos = "Ikeys Test Client",
+                nick = "quirky", /* Backup */
+                username = "quirkyclient",
+                gecos = "Quirky IRC Client",
                 mode = 0
             };
             ident.nick = dlg.nickname;
@@ -923,7 +923,7 @@ window.
     {
         switch (command) {
             case "VERSION":
-                core.send_ctcp(user.nick, "VERSION", "DummyClient 0.1 / Probably Linux!", privmsg);
+                core.send_ctcp(user.nick, "VERSION", "Quirky IRC Client 0.1 / Probably Linux!", privmsg);
                 break;
             case "PING":
                 if (text == "") {
@@ -1380,19 +1380,19 @@ public class ConnectDialog : Gtk.Dialog
 /**
  * Enable GtkApplication/actions usage..
  */
-public class DummyClientApp : Gtk.Application
+public class QuirkyClientApp : Gtk.Application
 {
-    static DummyClient win = null;
+    static QuirkyClient win = null;
 
-    public DummyClientApp()
+    public QuirkyClientApp()
     {
-        Object(application_id: "com.evolve_os.DummyIrcClient", flags: ApplicationFlags.FLAGS_NONE);
+        Object(application_id: "com.evolve_os.QuirkyIrcClient", flags: ApplicationFlags.FLAGS_NONE);
     }
 
     public override void activate()
     {
         if (win == null) {
-            win = new DummyClient(this);
+            win = new QuirkyClient(this);
         }
         win.show_all();
         win.present();
@@ -1401,6 +1401,6 @@ public class DummyClientApp : Gtk.Application
 
 public static int main(string[] args)
 {
-    var app = new DummyClientApp();
+    var app = new QuirkyClientApp();
     return app.run();
 }
