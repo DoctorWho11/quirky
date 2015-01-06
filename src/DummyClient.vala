@@ -215,6 +215,7 @@ window.
                     item.usable = true;
                 }
                 item.set_data("ichannel", c);
+                item.set_data("_ichannel", c); // for close_view
 
                 root.set_expanded(true);
                 root.select_item(item);
@@ -247,6 +248,7 @@ window.
                         this.target = null;
                     }
                 }
+                item.set_data("ichannel", null);
             } else {
                 nl_remove_user(core, c, u);
             }
@@ -968,7 +970,7 @@ window.
         item = buffer.get_data("sitem");
         root = buffer.get_data("header");
         if (item != null) {
-            channel = item.get_data("ichannel");
+            channel = item.get_data("_ichannel");
             user = item.get_data("iuser");
             core = item.get_data("icore");
             root = roots[core];
