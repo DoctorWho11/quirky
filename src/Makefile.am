@@ -44,6 +44,7 @@ dummy_client_SOURCES = \
 	IrcConstants.vala \
 	IrcCore.vala \
 	IrcTextWidget.vala \
+	Messages.vala \
 	Widgets.vala \
 	DummyClient.vala
 

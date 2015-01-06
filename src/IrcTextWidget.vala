@@ -22,22 +22,6 @@ public class MCS {
 }
 
 /**
- * Enable special rendering of certain message types
- */
-public enum IrcTextType {
-    MESSAGE,
-    ACTION,
-    JOIN,
-    PART,
-    NICK_CHANGE,
-    MOTD,
-    SERVER,
-    ERROR,
-    INFO,
-    QUIT
-}
-
-/**
  * Custom Entry enabling input of special control chars..
  */
 public class IrcTextEntry : Gtk.Entry
@@ -310,6 +294,9 @@ public class IrcTextWidget : Gtk.TextView
         right_margin = 6;
     }
 
+    /**
+     * Currently unused
+     */
     private bool mirc_color(string s)
     {
         unichar[] known = { '\x02', '\x03', '\x1D', '\x1F', '\x16', '\x0F' };
@@ -334,7 +321,7 @@ public class IrcTextWidget : Gtk.TextView
         buf.insert_with_tags_by_name(i, stamp, -1, "timestamp", "default");
     }
 
-    string get_nick_color(string whom)
+    int get_nick_color(string whom)
     {
         /* Don't ever use white/black */
         int nick_index = (int) (whom.hash() % mcols.size());
@@ -342,113 +329,61 @@ public class IrcTextWidget : Gtk.TextView
             nick_index = 2;
         }
 
-        return "m_" + mcols[nick_index];
+        return nick_index;
     }
 
     /**
-     * Add a nick change to this log.
+     * Helpers.
      */
-    public void add_nickchange(Gtk.TextBuffer buf, string oldnick, string newnick, string msg, bool us = false)
+    public void add_error(Gtk.TextBuffer buf, string fmt, ...)
     {
-        Gtk.TextIter i;
-        insert_timestamp(buf);
-
-        buf.get_end_iter(out i);
-
-        //" someone"
-        if (us) {
-            buf.insert_with_tags_by_name(i, "\t* You ", -1, "nickname", "default");
-        } else {
-            buf.insert_with_tags_by_name(i, @"\t* $(oldnick) ", -1, "nickname", get_nick_color(oldnick), "default");
-        }
-
-        buf.get_end_iter(out i);
-        //" changed their nick to"
-        buf.insert_with_tags_by_name(i, msg, -1, "default");
-        buf.get_end_iter(out i);
-        // somenewnick
-        buf.insert_with_tags_by_name(i, " " + newnick, -1, "nickname", get_nick_color(newnick), "default");
-        buf.get_end_iter(out i);
-        buf.insert_with_tags_by_name(i, "\n", -1, "default");
+        va_list va = va_list();
+        add_message(buf, null, MSG.ERROR, fmt.vprintf(va));
+    }
+    public void add_info(Gtk.TextBuffer buf, string fmt, ...)
+    {
+        va_list va = va_list();
+        add_message(buf, null, MSG.INFO, fmt.vprintf(va));
     }
 
-    public void add_message(Gtk.TextBuffer buf, string whom, string message, IrcTextType ttype)
+    public void add_message(Gtk.TextBuffer buf, string? whom, string format, ...)
     {
+        va_list va = va_list();
         string last_nick = buf.get_data("_lastnick");
-
-        string[] default_tags = { "default" };
-        switch (ttype) {
-            case IrcTextType.ACTION:
-                default_tags += "action";
-                break;
-            case IrcTextType.MOTD:
-                default_tags += "m_purple";
-                break;
-            case IrcTextType.JOIN:
-                default_tags += "m_green";
-                break;
-            case IrcTextType.PART:
-                default_tags += "m_red";
-                break;
-            case IrcTextType.SERVER:
-                default_tags += "m_brown";
-                break;
-            default:
-                break;
-        }
+        string[] lines = {};
 
         Gtk.TextIter i;
         buf.get_end_iter(out i);
+        insert_timestamp(buf);
 
-        if (last_nick != whom) {
+        if (whom == null) {
+            whom = "    ";
+        }
+
+        /**
+         * TODO: Think about re-adding this.
+         */
+        /*if (last_nick != whom) {
             if (ttype != IrcTextType.MOTD && ttype != IrcTextType.SERVER && ttype != IrcTextType.ERROR && ttype != IrcTextType.INFO) {
                 buf.insert_with_tags_by_name(i, " ", -1, "spacing", "default");
                 buf.get_end_iter(out i);
             }
-        }
+        }*/
 
-        insert_timestamp(buf);
 
-        buf.get_end_iter(out i);
+        lines = _print_formatted(format, va);
 
-        /* Custom formatting for certain message types.. */
-        if (ttype == IrcTextType.MESSAGE) {
-            if (last_nick != whom) {
-                buf.insert_with_tags_by_name(i, whom + "\t", -1, "nickname", get_nick_color(whom), "default");
-            } else {
-                buf.insert_with_tags_by_name(i, "\t", -1, "default");
-            }
-        } else if (ttype == IrcTextType.ACTION) {
-            buf.insert_with_tags_by_name(i, @"\t* $(whom) ", -1, "nickname", get_nick_color(whom), "action", "default");
-        } else if (ttype == IrcTextType.QUIT) {
-            buf.insert_with_tags_by_name(i, @"\t$(whom) ", -1, "nickname", get_nick_color(whom), "default");
-        } else if (ttype == IrcTextType.JOIN || ttype == IrcTextType.PART || ttype == IrcTextType.ERROR) {
-            buf.insert_with_tags_by_name(i, @"\t* ", -1, "default");
-            if (whom != "") {
-                buf.get_end_iter(out i);
-                buf.insert_with_tags_by_name(i, @"$(whom) ", -1, "nickname", get_nick_color(whom), "default");
-            }
-        } else {
-            //if (ttype != IrcTextType.SERVER && ttype != IrcTextType.MOTD) {
-                /* Default, right align everything.. */
-                buf.insert_with_tags_by_name(i, "\t", -1, "default");
-            //}
-        }
-    
-        buf.get_end_iter(out i);
-        int msg_start = i.get_offset();
+        foreach (var message in lines) {
+            buf.get_end_iter(out i);
+            int msg_start = i.get_offset();
 
-        /* Begin processing mirc colours.. */
-        if (mirc_color(message)) {
             /* Manual handling of string.. */
             bool bolding = false;
             bool italic = false;
             bool underline = false;
 
             List<string> styles = new List<string>();
-            foreach (var s in default_tags) {
-                styles.append(s);
-            }
+            styles.append("default");
 
             for (int j=0; j < message.length; j++) {
                 unichar c = message.get_char(j);
@@ -483,9 +418,7 @@ public class IrcTextWidget : Gtk.TextView
                         italic = false;
                         underline = false;
                         styles = new List<string>();
-                        foreach (var s in default_tags) {
-                            styles.append(s);
-                        }
+                        styles.append("default");
                         break;
                     case MCS.COLOR:
                         string tbuf = "";
@@ -524,6 +457,10 @@ public class IrcTextWidget : Gtk.TextView
                         } else {
                             fg_index = int.parse(tbuf);
                         }
+                        if (fg_index == 30) {
+                            fg_index = get_nick_color(whom);
+                        }
+
                         if (fg_index in mcols) {
                             styles.append("m_" + mcols[fg_index]);
                         }
@@ -549,54 +486,26 @@ public class IrcTextWidget : Gtk.TextView
             }
             buf.get_end_iter(out i);
             buf.insert_with_tags_by_name(i, "\n", -1, "default");
-        } else {
-            buf.get_end_iter(out i);
-            var offset = i.get_offset();
-            Gtk.TextIter s;
-            buf.insert(ref i, message, -1);
-            buf.get_iter_at_offset(out s, offset);
-            foreach (var st in default_tags) {
-                buf.apply_tag_by_name(st, s, i);
+  
+            /* Process URLs */
+            var urls = get_urls(message);
+            if (urls.length > 0) {
+                foreach (var url in urls) {
+                    Gtk.TextIter s;
+                    Gtk.TextIter e;
+                    buf.get_iter_at_offset(out s, msg_start+url.start);
+                    buf.get_iter_at_offset(out e, msg_start+url.start+url.url.length);
+                    var tag = buf.create_tag(null);
+                    tag.set_data("_uri", url.url);
+                    buf.apply_tag_by_name("url", s, e);
+                    buf.apply_tag(tag, s, e);
+                }
             }
-            buf.insert_with_tags_by_name(i, "\n", -1, "default");
-        }
-        if (ttype == IrcTextType.MESSAGE) {
             buf.set_data("_lastnick", whom);
-        } else {
-            buf.set_data("_lastnick", null);
+            update_tabs(buf, whom);
+
+            scroll_to_bottom(buffer);
         }
-
-        /* Process URLs */
-        var urls = get_urls(message);
-        if (urls.length > 0) {
-            foreach (var url in urls) {
-                Gtk.TextIter s;
-                Gtk.TextIter e;
-                buf.get_iter_at_offset(out s, msg_start+url.start);
-                buf.get_iter_at_offset(out e, msg_start+url.start+url.url.length);
-                var tag = buf.create_tag(null);
-                tag.set_data("_uri", url.url);
-                buf.apply_tag_by_name("url", s, e);
-                buf.apply_tag(tag, s, e);
-            }
-        }
-        update_tabs(buf, whom);
-
-        scroll_to_bottom(buffer);
-    }
-
-    public void add_error(Gtk.TextBuffer buf, string fmt, ...)
-    {
-        va_list va = va_list();
-        string line = fmt.vprintf(va);
-        add_message(buf, "", line, IrcTextType.ERROR);
-    }
-
-    public void add_info(Gtk.TextBuffer buf, string fmt, ...)
-    {
-        va_list va = va_list();
-        string line = fmt.vprintf(va);
-        add_message(buf, "", line, IrcTextType.INFO);
     }
 
     public void scroll_to_bottom(Gtk.TextBuffer? buffer)
@@ -692,6 +601,108 @@ public class IrcTextWidget : Gtk.TextView
                 inf.next();
             }
         } catch (Error e) {} 
+        return ret;
+    }
+
+    /**
+     * The notation we're supporting here is pretty much what you see in
+     * xchat's pevents configuration file.
+     * This enables us to handle various messages much more easily, such as:
+     *
+     * $t* $1 has joined $2
+     *
+     * Index parameters are replaced from the va_list indexes, and certain special
+     * control characters exist:
+     *
+     * $t = \t
+     * $n = \n (we split ourselves
+     * $$ = escaped dollar sign
+     * %C = mirc colour (%C03 or $C03,45, for example)
+     * %O = (O not ZERO) reset formatting
+     * %B = bold
+     * %I = italic
+     * %U = underline
+     *
+     * @note These match with existing conventions, such as the mirc keyboard
+     * shortcuts we have also mapped that enter these characters (CTRL+K being
+     * the clear exception, in order to assist in those porting old xchat themes
+     * in the future)
+     */
+    string[] _print_formatted(string fmt, va_list va)
+    {
+        StringBuilder b = new StringBuilder();
+
+        string[] opts = {};
+        string? nxt = null;
+        while ((nxt = va.arg<string>()) != null) {
+            opts += nxt;
+        }
+
+        string[] ret = {};
+
+        for (int i = 0; i < fmt.length; i++) {
+            var c = fmt.get_char(i);
+            switch (c) {
+                case '$':
+                    /* Indexed argument follows.. */
+                    assert(i+1 <= fmt.length);
+                    unichar j = fmt.get_char(i+1);
+                    i++;
+                    if (j.isdigit()) {
+                        int index = int.parse(j.to_string());
+                        if (index < 0 || index > opts.length) {
+                            warning("Format string requested invalid index %d: %s", index, fmt);
+                            b.append("null");
+                            continue;
+                        }
+                        string replace = opts[index-1];
+                        b.append(replace);
+                    } else if (j == '$') {
+                        b.append("$");
+                    } else if (j == 't') {
+                        b.append("\t");
+                    } else if (j == 'n') {
+                        /* newline.. */
+                        ret += b.str;
+                        b.truncate(0);
+                    } else {
+                        warning("Invalid $notation: %s, skipping..", j.to_string());
+                    }
+                    break;
+                case '%':
+                    /* colours */
+                    assert(i+1 <= fmt.length);
+                    unichar j = fmt.get_char(i+1);
+                    if (j == '%') {
+                        b.append_unichar(j);
+                        i++;
+                        break;
+                    }
+                    if (j == 'C') {
+                        b.append_unichar(MCS.COLOR);
+                    } else if (j == 'B') {
+                        /* bold */
+                        b.append_unichar(MCS.BOLD);
+                    } else if (j == 'I') {
+                        /* italic */
+                        b.append_unichar(MCS.ITALIC);
+                    } else if (j == 'U') {
+                        /* underline */
+                        b.append_unichar(MCS.UNDERLINE);
+                    } else if (j == 'O') {
+                        /* reset */
+                        b.append_unichar(MCS.RESET);
+                    }
+                    i++;
+                    break;
+                default:
+                    b.append_unichar(c);
+                    break;
+            }
+        }
+        if (b.len > 0) {
+            ret += b.str;
+        }
         return ret;
     }
 }

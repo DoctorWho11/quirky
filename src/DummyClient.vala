@@ -86,15 +86,16 @@ This message won't be in the final versions :)
 In the mean time, connect to a network using the button at the top left of this
 window.
 
- - ufee1dead""";
+ - ufee1dead """;
 
         foreach (var line in msg.split("\n")) {
-            main_view.add_message(buffer, "", line, IrcTextType.MOTD);
+            main_view.add_message(buffer, null, MSG.DISCLAIM, line);
         }
         // set_buffer looks for this or core.ident
         buffer.set_data("longestnick", "info");
         set_buffer(buffer);
     }
+
     private void update_actions()
     {
         (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected);
@@ -155,7 +156,7 @@ window.
 
         core.connecting.connect((s,h,p,m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
-            main_view.add_message(buf, "", m, IrcTextType.SERVER);
+            main_view.add_message(buf, null, MSG.INFO, m);
             /* Just ensures we don't use nicknames for sizing of our margin/indent */
             main_view.update_tabs(buf, " ", true);
         });
@@ -219,10 +220,10 @@ window.
 
                 root.set_expanded(true);
                 root.select_item(item);
-                main_view.add_message(buf, "", @"You have joined $(c)", IrcTextType.JOIN);
+                main_view.add_message(buf, core.ident.nick, MSG.YOU_JOIN, core.ident.nick, c);
             } else {
                 var buf = get_named_buffer(core, c); /* do nothing :P */
-                main_view.add_message(buf, u.nick, @"has joined $(c)", IrcTextType.JOIN);
+                main_view.add_message(buf, u.nick, MSG.JOIN, core.ident.nick, c);
 
                 nl_add_user(core, c, u);
             }
@@ -237,7 +238,22 @@ window.
             if (buf == null) {
                 return;
             }
-            main_view.add_message(buf, u.nick == core.ident.nick ? "" : u.nick, msg, IrcTextType.PART);
+            string response;
+            if (u.nick == core.ident.nick) {
+                if (r == null) {
+                    response = MSG.YOU_PART;
+                } else {
+                    response = MSG.YOU_PART_R;
+                }
+            } else {
+                if (r == null) {
+                    response = MSG.PART;
+                } else {
+                    response = MSG.PART_R;
+                }
+            }
+
+            main_view.add_message(buf, u.nick, response, u.nick, c, r);
             /* Did **we** leave? :o */
             if (u.nick == core.ident.nick) {
                 SidebarItem? item = buf.get_data("sitem");
@@ -255,15 +271,15 @@ window.
         });
         core.motd_start.connect((m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
-            main_view.add_message(buf, "", m, IrcTextType.MOTD);
+            main_view.add_message(buf, null, MSG.MOTD, m);
         });
         core.motd_line.connect((m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
-            main_view.add_message(buf, "", m, IrcTextType.MOTD);
+            main_view.add_message(buf, null, MSG.MOTD, m);
         });
         core.motd.connect((o,m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
-            main_view.add_message(buf, "", m, IrcTextType.MOTD);
+            main_view.add_message(buf, null, MSG.MOTD, m);
         });
         core.nick_changed.connect((u,n,us)=> {
             if (us) {
@@ -278,11 +294,7 @@ window.
                     var buf = get_named_buffer(core, c);
                     if (buf != null) {
                         /* Update the channel buffer.. */
-                        if (!us) {
-                            main_view.add_nickchange(buf, u.nick, n, "changed their nick to");
-                        } else {
-                            main_view.add_nickchange(buf, u.nick, n, "changed your nick to", true);
-                        }
+                        main_view.add_message(buf, u.nick, us ? MSG.YOU_NICK : MSG.NICK, u.nick, n);
                     }
                 }
             });
@@ -304,7 +316,7 @@ window.
                         if (r != null) {
                             quit_msg += @" ($(r))";
                         }
-                        main_view.add_message(buf, u.nick, quit_msg, IrcTextType.QUIT);
+                        main_view.add_message(buf, u.nick, MSG.QUIT, u.nick, r);
                     }
                 }
             });
@@ -399,9 +411,9 @@ window.
         commands["me"] = Command() {
             cb = (line)=> {
                 core.send_action(this.target, line);
-                main_view.add_message(main_view.buffer, core.ident.nick, line,  IrcTextType.ACTION);
+                main_view.add_message(main_view.buffer, core.ident.nick, MSG.ACTION, core.ident.nick, line);
             },
-            help = "%C <action>, sends an \"action\" to the current channel or person",
+            help = "<action>, sends an \"action\" to the current channel or person",
             min_params = 1
         };
         /* Handle /join */
@@ -409,7 +421,7 @@ window.
             cb = (line)=> {
                 core.join_channel(line);
             },
-            help = "%C <channel> [password], join the given channel with an optional password",
+            help = "<channel> [password], join the given channel with an optional password",
             min_params = 1,
             server = true
         };
@@ -418,7 +430,7 @@ window.
             cb = (line)=> {
                 core.set_nick(line);
             },
-            help = "%C <nickname>, set your new nickname on this IRC server",
+            help = "<nickname>, set your new nickname on this IRC server",
             min_params = 1,
             max_params = 1,
             server = true
@@ -428,7 +440,7 @@ window.
             cb = (line)=> {
                 core.send_quote(line);
             },
-            help = "%C <text>, send raw text to the server",
+            help = "<text>, send raw text to the server",
             min_params = 1,
             server = true
         };
@@ -438,7 +450,7 @@ window.
                 var buffer = get_named_buffer(core, line);
                 ensure_view(core, buffer, line, true);
             },
-            help = "%C <user>, start a query with a user",
+            help = "<user>, start a query with a user",
             min_params = 1,
             max_params = 1,
             server = true
@@ -467,7 +479,7 @@ window.
                     }
                 }
             },
-            help = "%C [channel] [reason], leave a given channel with an optional reason, or the current one",
+            help = "[channel] [reason], leave a given channel with an optional reason, or the current one",
             min_params = 0,
             max_params = -1,
             server = true
@@ -487,7 +499,7 @@ window.
                     core.join_channel(line);
                 }
             },
-            help = "%C [channel], part and immediately rejoin the channel",
+            help = "[channel], part and immediately rejoin the channel",
             min_params = 0,
             max_params = 1,
             server = true
@@ -496,23 +508,19 @@ window.
             cb = (line)=> {
                 if (line == null) {
                     /* Display all help topics.. */
-                    main_view.add_info(main_view.buffer, "");
-                    main_view.add_info(main_view.buffer, "For info on a given command, type /HELP [command]. Available commands are:");
-                    main_view.add_info(main_view.buffer, "");
+                    main_view.add_message(main_view.buffer, null, MSG.HELP_LIST, "For info on a given command, type /HELP [command]. Available commands are:");
                     commands.foreach((k,v)=> {
-                        main_view.add_info(main_view.buffer, "\u2022 %s", k);
+                        main_view.add_message(main_view.buffer, null, MSG.HELP_ITEM, k);
                     });
-                    main_view.add_info(main_view.buffer, "");
                 } else {
-                    main_view.add_info(main_view.buffer, "");
                     if (!(line in commands)) {
                         main_view.add_info(main_view.buffer, "%s: Unknown command. Type /HELP for a list of commands.", line.split(" ")[0]);
                     } else {
-                        main_view.add_info(main_view.buffer, "%s", template(commands[line].help, line));
+                        main_view.add_message(main_view.buffer, line, MSG.HELP_VIEW, line.up(), commands[line].help);
                     }
                 }
             },
-            help = "%C - Display help",
+            help = "Display help",
             min_params = 0,
             max_params = -1,
             server = true,
@@ -522,7 +530,7 @@ window.
             cb = (line)=> {
                 close_view(main_view.buffer);
             },
-            help = "%C, closes the current view, parting or disconnecting as appropriate",
+            help = "closes the current view, parting or disconnecting as appropriate",
             min_params = 0,
             max_params = 0,
             server = true,
@@ -912,7 +920,7 @@ window.
         /* We really need to think about output throttling. */
         foreach (var msg in message.split("\n")) {
             core.send_message(target, msg);
-            main_view.add_message(buffer, core.ident.nick, msg, IrcTextType.MESSAGE);
+            main_view.add_message(buffer, core.ident.nick, MSG.MESSAGE, core.ident.nick, msg);
         }
         main_view.update_tabs(buffer, core.ident.nick);
     }
@@ -1041,9 +1049,9 @@ window.
             buffer = get_named_buffer(core, target);
         }
         if ((type & IrcMessageType.ACTION) != 0) {
-            main_view.add_message(buffer, user.nick, message, IrcTextType.ACTION);
+            main_view.add_message(buffer, user.nick, MSG.ACTION, user.nick, message);
         } else {
-            main_view.add_message(buffer, user.nick, message, IrcTextType.MESSAGE);
+            main_view.add_message(buffer, user.nick, MSG.MESSAGE, user.nick, message);
         }
     }
 
