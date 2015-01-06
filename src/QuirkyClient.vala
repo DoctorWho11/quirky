@@ -446,6 +446,7 @@ window.
     {
         Object(application: application);
 
+
         _messages = new HashTable<string,string>(str_hash,str_equal);
         init_messages();
 
@@ -630,6 +631,7 @@ window.
         menu = new Menu();
         menu.append("Show timestamps", "app.timestamps");
         menu.append("Show margin", "app.margin");
+        menu.append("Use dark theme", "app.dark_theme");
         btn.set_menu_model(menu);
         btn.set_use_popover(true);
         header.pack_end(btn);
@@ -638,6 +640,9 @@ window.
         var paction = new PropertyAction("timestamps", main_view, "use_timestamp");
         application.add_action(paction);
         paction = new PropertyAction("margin", main_view, "visible_margin");
+        application.add_action(paction);
+
+        paction = new PropertyAction("dark_theme", get_settings(), "gtk-application-prefer-dark-theme");
         application.add_action(paction);
 
         update_actions();
