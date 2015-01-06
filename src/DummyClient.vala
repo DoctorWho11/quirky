@@ -53,6 +53,8 @@ public class DummyClient : Gtk.ApplicationWindow
     Gtk.Revealer nick_reveal;
     Gtk.Revealer side_reveal;
 
+    /** Store our client messages.. */
+    HashTable<string,string> _messages;
 
     const string VOICE_ICON = "non-starred-symbolic";
     const string HALFOP_ICON = "semi-starred-symbolic";
@@ -89,7 +91,7 @@ window.
  - ufee1dead """;
 
         foreach (var line in msg.split("\n")) {
-            main_view.add_message(buffer, null, MSG.DISCLAIM, line);
+            main_view.add_message(buffer, null, _M(MSG.DISCLAIM), line);
         }
         // set_buffer looks for this or core.ident
         buffer.set_data("longestnick", "info");
@@ -156,7 +158,7 @@ window.
 
         core.connecting.connect((s,h,p,m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
-            main_view.add_message(buf, null, MSG.INFO, m);
+            main_view.add_message(buf, null, _M(MSG.INFO), m);
             /* Just ensures we don't use nicknames for sizing of our margin/indent */
             main_view.update_tabs(buf, " ", true);
         });
@@ -220,10 +222,10 @@ window.
 
                 root.set_expanded(true);
                 root.select_item(item);
-                main_view.add_message(buf, core.ident.nick, MSG.YOU_JOIN, core.ident.nick, c);
+                main_view.add_message(buf, core.ident.nick, _M(MSG.YOU_JOIN), core.ident.nick, c);
             } else {
                 var buf = get_named_buffer(core, c); /* do nothing :P */
-                main_view.add_message(buf, u.nick, MSG.JOIN, core.ident.nick, c);
+                main_view.add_message(buf, u.nick, _M(MSG.JOIN), core.ident.nick, c);
 
                 nl_add_user(core, c, u);
             }
@@ -253,7 +255,7 @@ window.
                 }
             }
 
-            main_view.add_message(buf, u.nick, response, u.nick, c, r);
+            main_view.add_message(buf, u.nick, _M(response), u.nick, c, r);
             /* Did **we** leave? :o */
             if (u.nick == core.ident.nick) {
                 SidebarItem? item = buf.get_data("sitem");
@@ -271,15 +273,15 @@ window.
         });
         core.motd_start.connect((m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
-            main_view.add_message(buf, null, MSG.MOTD, m);
+            main_view.add_message(buf, null, _M(MSG.MOTD), m);
         });
         core.motd_line.connect((m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
-            main_view.add_message(buf, null, MSG.MOTD, m);
+            main_view.add_message(buf, null, _M(MSG.MOTD), m);
         });
         core.motd.connect((o,m)=> {
             var buf = get_named_buffer(core, "\\ROOT\\");
-            main_view.add_message(buf, null, MSG.MOTD, m);
+            main_view.add_message(buf, null, _M(MSG.MOTD), m);
         });
         core.nick_changed.connect((u,n,us)=> {
             if (us) {
@@ -294,7 +296,7 @@ window.
                     var buf = get_named_buffer(core, c);
                     if (buf != null) {
                         /* Update the channel buffer.. */
-                        main_view.add_message(buf, u.nick, us ? MSG.YOU_NICK : MSG.NICK, u.nick, n);
+                        main_view.add_message(buf, u.nick, us ? _M(MSG.YOU_NICK) : _M(MSG.NICK), u.nick, n);
                     }
                 }
             });
@@ -316,7 +318,7 @@ window.
                         if (r != null) {
                             quit_msg += @" ($(r))";
                         }
-                        main_view.add_message(buf, u.nick, MSG.QUIT, u.nick, r);
+                        main_view.add_message(buf, u.nick, _M(MSG.QUIT), u.nick, r);
                     }
                 }
             });
@@ -394,9 +396,46 @@ window.
         return strcmp(ia.nick.down(), ib.nick.down());
     }
 
+    void init_messages()
+    {
+        try {
+            var ini = new KeyFile();
+            uint8[] data;
+            /* For now we'll pull the one in from the binary */
+            var f = File.new_for_uri("resource:///com/evolve_os/irc_client/messages.conf");
+            f.load_contents(null, out data, null);
+            ini.load_from_data((string)data, data.length, KeyFileFlags.NONE);
+
+            foreach (var key in ini.get_keys("Messages")) {
+                var s = ini.get_string("Messages", key);
+                if (s.has_prefix(" ")) {
+                    s = s.substring(1);
+                }
+                _messages[key] = s;
+            }
+        } catch (Error e) {
+            message("MISSING MESSAGES CONFIG: %s", e.message);
+            /* Coredumping is so last century. */
+        }
+    }
+
+    /**
+     * Return a string, check MSG for index names
+     */
+    string _M(string key) {
+        if (!(key in _messages)) {
+            warning("MISSING TEXT: %s", key);
+            return "@@@MISSING@@@";
+        }
+        return _messages[key];
+    }
+
     public DummyClient(Gtk.Application application)
     {
         Object(application: application);
+
+        _messages = new HashTable<string,string>(str_hash,str_equal);
+        init_messages();
 
         header = new Gtk.HeaderBar();
         header.set_show_close_button(true);
@@ -411,7 +450,7 @@ window.
         commands["me"] = Command() {
             cb = (line)=> {
                 core.send_action(this.target, line);
-                main_view.add_message(main_view.buffer, core.ident.nick, MSG.ACTION, core.ident.nick, line);
+                main_view.add_message(main_view.buffer, core.ident.nick, _M(MSG.ACTION), core.ident.nick, line);
             },
             help = "<action>, sends an \"action\" to the current channel or person",
             min_params = 1
@@ -508,15 +547,15 @@ window.
             cb = (line)=> {
                 if (line == null) {
                     /* Display all help topics.. */
-                    main_view.add_message(main_view.buffer, null, MSG.HELP_LIST, "For info on a given command, type /HELP [command]. Available commands are:");
+                    main_view.add_message(main_view.buffer, null, _M(MSG.HELP_LIST), "For info on a given command, type /HELP [command]. Available commands are:");
                     commands.foreach((k,v)=> {
-                        main_view.add_message(main_view.buffer, null, MSG.HELP_ITEM, k);
+                        main_view.add_message(main_view.buffer, null, _M(MSG.HELP_ITEM), k);
                     });
                 } else {
                     if (!(line in commands)) {
                         main_view.add_info(main_view.buffer, "%s: Unknown command. Type /HELP for a list of commands.", line.split(" ")[0]);
                     } else {
-                        main_view.add_message(main_view.buffer, line, MSG.HELP_VIEW, line.up(), commands[line].help);
+                        main_view.add_message(main_view.buffer, line, _M(MSG.HELP_VIEW), line.up(), commands[line].help);
                     }
                 }
             },
@@ -920,7 +959,7 @@ window.
         /* We really need to think about output throttling. */
         foreach (var msg in message.split("\n")) {
             core.send_message(target, msg);
-            main_view.add_message(buffer, core.ident.nick, MSG.MESSAGE, core.ident.nick, msg);
+            main_view.add_message(buffer, core.ident.nick, _M(MSG.MESSAGE), core.ident.nick, msg);
         }
         main_view.update_tabs(buffer, core.ident.nick);
     }
@@ -1049,9 +1088,9 @@ window.
             buffer = get_named_buffer(core, target);
         }
         if ((type & IrcMessageType.ACTION) != 0) {
-            main_view.add_message(buffer, user.nick, MSG.ACTION, user.nick, message);
+            main_view.add_message(buffer, user.nick, _M(MSG.ACTION), user.nick, message);
         } else {
-            main_view.add_message(buffer, user.nick, MSG.MESSAGE, user.nick, message);
+            main_view.add_message(buffer, user.nick, _M(MSG.MESSAGE), user.nick, message);
         }
     }
 

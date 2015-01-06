@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-        <gresource prefix="/com/evolve-os/irc_client">
+        <gresource prefix="/com/evolve_os/irc_client">
                 <file>servers.conf</file>
+                <file>messages.conf</file>
         </gresource>
 </gresources>
