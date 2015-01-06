@@ -510,7 +510,7 @@ window.
                     }
                 }
             },
-            help = "%s - Display help",
+            help = "%C - Display help",
             min_params = 0,
             max_params = -1,
             server = true,
@@ -520,7 +520,7 @@ window.
             cb = (line)=> {
                 close_view(main_view.buffer);
             },
-            help = "%s, closes the current view, parting or disconnecting as appropriate",
+            help = "%C, closes the current view, parting or disconnecting as appropriate",
             min_params = 0,
             max_params = 0,
             server = true,
