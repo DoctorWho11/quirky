@@ -421,22 +421,43 @@ public class IrcTextWidget : Gtk.TextView
                         styles.append("default");
                         break;
                     case MCS.COLOR:
-                        string tbuf = "";
+                        StringBuilder tbuf = new StringBuilder();
                         int k = j;
                         int sk = j;
+                        bool comma = false;
+                        int lside = 0;
+                        int rside = 0;
                         if (k+1 < message.length) {
                             for (k = j+1; k < message.length; k++) {
-                                var ch = message.get_char(k);
-                                if (ch == ',' || ch.isdigit()) {
-                                    tbuf += ch.to_string();
+                                c = message.get_char(k);
+                                if (c.isdigit()) {
+                                    if (!comma) {
+                                        lside++;
+                                    } else {
+                                        rside++;
+                                    }
+                                } else if (c == ',') {
+                                    if (k+1 < message.length && !message.get_char(k+1).isdigit()) {
+                                        k--;
+                                        break;
+                                    }
+                                    comma = true;
                                 } else {
-                                    k -= 1;
+                                    k--;
                                     break;
                                 }
+                                if (!comma && lside > 2) {
+                                    k--;
+                                    break;
+                                } else if (comma && rside > 2) {
+                                    k--;
+                                    break;
+                                }
+                                tbuf.append_unichar(c);
                             }
                             j = k;
                         }
-                        if (tbuf.length == 0) {
+                        if (tbuf.str.length == 0) {
                             /* Ugly as shit but that's what happens when we you used linked lists.. */
                             var  blist = styles.copy();
                             foreach (var st in blist) {
@@ -450,12 +471,12 @@ public class IrcTextWidget : Gtk.TextView
                         }
                         int fg_index = -1;
                         int bg_index = -1;
-                        if ("," in tbuf) {
-                            var split = tbuf.split(",");
+                        if ("," in tbuf.str) {
+                            var split = tbuf.str.split(",");
                             fg_index = int.parse(split[0]);
                             bg_index = int.parse(split[1]);
                         } else {
-                            fg_index = int.parse(tbuf);
+                            fg_index = int.parse(tbuf.str);
                         }
                         if (fg_index == 30) {
                             fg_index = get_nick_color(whom);
