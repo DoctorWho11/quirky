@@ -225,7 +225,7 @@ window.
                 main_view.add_message(buf, core.ident.nick, _M(MSG.YOU_JOIN), core.ident.nick, c);
             } else {
                 var buf = get_named_buffer(core, c); /* do nothing :P */
-                main_view.add_message(buf, u.nick, _M(MSG.JOIN), core.ident.nick, c);
+                main_view.add_message(buf, u.nick, _M(MSG.JOIN), u.nick, c);
 
                 nl_add_user(core, c, u);
             }
