@@ -506,7 +506,7 @@ window.
                 } else {
                     main_view.add_info(main_view.buffer, "");
                     if (!(line in commands)) {
-                        main_view.add_info(main_view.buffer, "%s: Unknown command. Type /HELP for a list of commands.", line);
+                        main_view.add_info(main_view.buffer, "%s: Unknown command. Type /HELP for a list of commands.", line.split(" ")[0]);
                     } else {
                         main_view.add_info(main_view.buffer, "%s", template(commands[line].help, line));
                     }
