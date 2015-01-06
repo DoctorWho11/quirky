@@ -332,20 +332,6 @@ public class IrcTextWidget : Gtk.TextView
         return nick_index;
     }
 
-    /**
-     * Helpers.
-     */
-    public void add_error(Gtk.TextBuffer buf, string fmt, ...)
-    {
-        va_list va = va_list();
-        add_message(buf, null, MSG.ERROR, fmt.vprintf(va));
-    }
-    public void add_info(Gtk.TextBuffer buf, string fmt, ...)
-    {
-        va_list va = va_list();
-        add_message(buf, null, MSG.INFO, fmt.vprintf(va));
-    }
-
     public void add_message(Gtk.TextBuffer buf, string? whom, string format, ...)
     {
         va_list va = va_list();

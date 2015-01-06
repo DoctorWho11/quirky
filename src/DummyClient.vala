@@ -430,6 +430,18 @@ window.
         return _messages[key];
     }
 
+    private void add_error(Gtk.TextBuffer buf, string fmt, ...)
+    {
+        va_list va = va_list();
+        main_view.add_message(buf, null, _M(MSG.ERROR), fmt.vprintf(va));
+    }
+
+    private void add_info(Gtk.TextBuffer buf, string fmt, ...)
+    {
+        va_list va = va_list();
+        main_view.add_message(buf, null, _M(MSG.INFO), fmt.vprintf(va));
+    }
+
     public DummyClient(Gtk.Application application)
     {
         Object(application: application);
@@ -499,12 +511,12 @@ window.
             cb = (line)=> {
                 if (line == null) {
                     if (this.target == null || !this.is_channel) {
-                        main_view.add_error(main_view.buffer, JOIN_STRING);
+                        add_error(main_view.buffer, JOIN_STRING);
                     } else {
                         /* Current channel. (no default part message yet) */
                         SidebarItem? item = main_view.buffer.get_data("sitem");
                         if (!item.usable) {
-                            main_view.add_error(main_view.buffer, JOIN_STRING);
+                            add_error(main_view.buffer, JOIN_STRING);
                         } else {
                             core.part_channel(this.target, null);
                         }
@@ -528,7 +540,7 @@ window.
             cb = (line)=> {
                 if (line == null) {
                     if (this.target == null) {
-                        main_view.add_error(main_view.buffer, JOIN_STRING);
+                        add_error(main_view.buffer, JOIN_STRING);
                     } else {
                         core.part_channel(this.target, null);
                         core.join_channel(this.target);
@@ -553,7 +565,7 @@ window.
                     });
                 } else {
                     if (!(line in commands)) {
-                        main_view.add_info(main_view.buffer, "%s: Unknown command. Type /HELP for a list of commands.", line.split(" ")[0]);
+                        add_info(main_view.buffer, "%s: Unknown command. Type /HELP for a list of commands.", line.split(" ")[0]);
                     } else {
                         main_view.add_message(main_view.buffer, line, _M(MSG.HELP_VIEW), line.up(), commands[line].help);
                     }
@@ -855,7 +867,7 @@ window.
                 /* Attempt to reuse the name with a _, if the nick was in use during
                  * connection. */
                 var buffer = get_named_buffer(core, "\\ROOT\\");
-                main_view.add_error(buffer, "%s is already in use", nick);
+                add_error(buffer, "%s is already in use", nick);
                 string? tmp_nick = core.get_data("attemptnick");
                 if (tmp_nick == null) {
                     tmp_nick = core.ident.nick;
@@ -866,8 +878,8 @@ window.
                 if (!core.connected) {
                     int count = core.get_data("nicktries");
                     if (count >= 3) {
-                        main_view.add_error(buffer, "Attempted too many times to change nick");
-                        main_view.add_error(buffer, "Disconnecting");
+                        add_error(buffer, "Attempted too many times to change nick");
+                        add_error(buffer, "Disconnecting");
                         core.disconnect();
                         break;
                     }
@@ -879,7 +891,7 @@ window.
                 break;
             default:
                 var buffer = get_named_buffer(core, "\\ROOT\\");
-                main_view.add_error(buffer, "%s: %s", nick, human);
+                add_error(buffer, "%s: %s", nick, human);
                 break;
         }
     }
@@ -940,12 +952,12 @@ window.
         }
 
         if (core == null) {
-            main_view.add_error(main_view.buffer, "You are not currently connected");
+            add_error(main_view.buffer, "You are not currently connected");
             input.set_text("");
             return;
         }
         if (target == null) {
-            main_view.add_error(main_view.buffer, JOIN_STRING);
+            add_error(main_view.buffer, JOIN_STRING);
             input.set_text("");
             return;
         }
@@ -1114,34 +1126,34 @@ window.
         var p = line.split(" ");
         var cmd = p[0].down();
         if (!(cmd in commands)) {
-            main_view.add_error(main_view.buffer, "Unknown command: %s", cmd);
+            add_error(main_view.buffer, "Unknown command: %s", cmd);
             return;
         }
         weak Command? command = commands.lookup(cmd);
         if (this.core == null && !command.offline) {
-            main_view.add_error(main_view.buffer, "/%s can only be used while connected", cmd);
+            add_error(main_view.buffer, "/%s can only be used while connected", cmd);
             return;
         }
         if (this.target == null && !command.server) {
-            main_view.add_error(main_view.buffer, "/%s cannot be used in the server view", cmd);
+            add_error(main_view.buffer, "/%s cannot be used in the server view", cmd);
             return;
         }
         var r = p[1:p.length];
         if (r.length < command.min_params) {
             if (command.help != null) {
                 var parsed = template(command.help, cmd.up());
-                main_view.add_error(main_view.buffer, "Usage: %s", parsed);
+                add_error(main_view.buffer, "Usage: %s", parsed);
             } else {
-                main_view.add_error(main_view.buffer, "Invalid use of /%s", cmd);
+                add_error(main_view.buffer, "Invalid use of /%s", cmd);
             }
             return;
         }
         if (r.length > command.max_params && command.max_params >= command.min_params) {
             if (command.help != null) {
                 var parsed = template(command.help, cmd.up());
-                main_view.add_error(main_view.buffer, "Usage: %s", parsed);
+                add_error(main_view.buffer, "Usage: %s", parsed);
             } else {
-                main_view.add_error(main_view.buffer, "Invalid use of /%s", cmd);
+                add_error(main_view.buffer, "Invalid use of /%s", cmd);
             }
             return;
         }
