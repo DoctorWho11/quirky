@@ -185,7 +185,9 @@ window.
                     item.activated.connect(()=> {
                         var nbuf = get_named_buffer(core, c);
                         this.core = item.get_data("icore");
-                        this.target = item.get_data("ichannel");
+                        if (item.usable) {
+                            this.target = item.get_data("ichannel");
+                        }
                         this.is_channel = true;
                         set_buffer(nbuf);
                         update_actions();
@@ -220,16 +222,20 @@ window.
             if (r != null) {
                 msg += @" ($(r))";
             }
-            var buf = get_named_buffer(core, c);
+            var buf = get_named_buffer(core, c, false);
+            if (buf == null) {
+                return;
+            }
             main_view.add_message(buf, u.nick == core.ident.nick ? "" : u.nick, msg, IrcTextType.PART);
             /* Did **we** leave? :o */
             if (u.nick == core.ident.nick) {
                 SidebarItem? item = buf.get_data("sitem");
-                item.usable = false;
-                item.set_data("ichannel", null);
-                nl_destroy(core, c);
-                if (this.target == c) {
-                    this.target = null;
+                if (item != null) {
+                    item.usable = false;
+                    nl_destroy(core, c);
+                    if (this.target == c) {
+                        this.target = null;
+                    }
                 }
             } else {
                 nl_remove_user(core, c, u);
@@ -434,7 +440,7 @@ window.
                     } else {
                         /* Current channel. (no default part message yet) */
                         SidebarItem? item = main_view.buffer.get_data("sitem");
-                        if (item.usable) {
+                        if (!item.usable) {
                             main_view.add_error(main_view.buffer, JOIN_STRING);
                         } else {
                             core.part_channel(this.target, null);
@@ -497,6 +503,16 @@ window.
             help = "%s - Display help",
             min_params = 0,
             max_params = -1,
+            server = true,
+            offline = true
+        };
+        commands["close"] = Command() {
+            cb = (line)=> {
+                close_view(main_view.buffer);
+            },
+            help = "%s, closes the current view, parting or disconnecting as appropriate",
+            min_params = 0,
+            max_params = 0,
             server = true,
             offline = true
         };
@@ -752,7 +768,7 @@ window.
         list.set(iter, 0, copy.nick, 1, copy, 2, icon_name);
     }
 
-    public bool handle_quit(Gdk.EventAny evt)
+    void _disconnect()
     {
         hide();
 
@@ -763,6 +779,11 @@ window.
                 k.quit(QUIT_MESSAGE);
             }
         });
+    }
+
+    public bool handle_quit(Gdk.EventAny evt)
+    {
+        _disconnect();
 
         return Gdk.EVENT_PROPAGATE;
     }
@@ -915,6 +936,60 @@ window.
             var root = roots[core];
             root.select_item(item);
         }
+    }
+
+
+    /**
+     * Close a view by its buffer. May be any supported view.
+     */
+    private void close_view(Gtk.TextBuffer? buffer)
+    {
+        SidebarExpandable? root;
+        SidebarItem? item;
+        IrcCore? core = null;
+        string? channel = null;
+        string? user = null;
+
+        if (buffer == null) {
+            return;
+        }
+        string dtarget = "";
+
+        item = buffer.get_data("sitem");
+        root = buffer.get_data("header");
+        if (item != null) {
+            channel = item.get_data("ichannel");
+            user = item.get_data("iuser");
+            core = item.get_data("icore");
+            root = roots[core];
+            item.usable = false;
+        } 
+
+        /* Handle channel closes.. */
+        if (channel != null) {
+            if (item.usable) {
+                /* Part the channel. */
+                core.part_channel(channel, null);
+                nl_destroy(core, channel);
+            }
+            dtarget = channel;
+        } else if (user != null) {
+            dtarget = user;
+        } else {
+            /* Server page.. ? */
+            if (roots.size() == 0) {
+                /* Just quit. */
+                _disconnect();
+                this.destroy();
+                return;
+            }
+            // TODO: Add support to close/disconnect servers!
+            return;
+        }
+        string id = @"$(core.id)$(dtarget)";
+
+        buffers.remove(id);
+        root.remove_item(item);
     }
 
     private void set_buffer(Gtk.TextBuffer buffer)

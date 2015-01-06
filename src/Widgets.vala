@@ -107,6 +107,9 @@ public class SidebarItem : Gtk.EventBox
         var box = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
         add(box);
 
+        _usable = true;
+        usable = true;
+
         l = new Gtk.Label(label);
         l.halign = Gtk.Align.START;
         box.margin_left = 20;
@@ -151,6 +154,8 @@ public class SidebarExpandable : Gtk.Box
 
     private Gtk.Revealer revealer;
     private Gtk.Box revealer_box;
+
+    private List<SidebarItem> items;
 
     public string label {
         public set {
@@ -242,12 +247,49 @@ public class SidebarExpandable : Gtk.Box
     {
         var item = new SidebarItem(label, icon);
         item.button_press_event.connect(handle_mouse);
-        item.destroy.connect(()=> {
-            update_expander();
-        });
         revealer_box.pack_start(item);
         update_expander();
+
+        item.set_data("index", items.length());
+        items.append(item);
         return item;
+    }
+
+    public void remove_item(SidebarItem? item)
+    {
+        revealer_box.remove(item);
+        SidebarItem? target = null;
+
+        int index = item.get_data("index");
+
+        if (items.length()-1 == 0) {
+            /* We just activate ourselves. */
+            selected_item = null;
+            activated();
+            clicked();
+            selected = true;
+        } else {
+            // choose previous first if we can, otherwise next
+            if (index-1 >= 0) {
+                target = items.nth_data(index-1);
+            } else {
+                target = items.nth_data(index+1);
+            }
+            this.select_item(target);
+            target.activate();
+        }
+
+        /* move chain down */
+        if (index < items.length()) {
+            for (int i = index+1; i < items.length(); i++) {
+                var old = items.nth_data(i);
+                old.set_data("index", i-1);
+            }
+        }
+        items.remove(item);
+
+        update_expander();
+        return;
     }
 
     private void update_expander()
@@ -291,6 +333,7 @@ public class SidebarExpandable : Gtk.Box
         var overlay = new Gtk.Overlay();
         pack_start(overlay, false, false, 0);
 
+        items = new List<SidebarItem>();
 
         /* includes whole widget.. */
         get_style_context().add_class("sidebar-expandable");
