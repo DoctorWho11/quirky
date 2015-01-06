@@ -118,7 +118,10 @@ window.
             nick_reveal.set_reveal_child(false);
             nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
         });
+
         side_reveal.set_reveal_child(true);
+        /* reverse the polarity >_> */
+        side_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_RIGHT);
 
         /* Need moar status in window.. */
         message("Connecting to %s:%d", host, port);
@@ -127,6 +130,13 @@ window.
         roots[core] = header;
         header.set_data("icore", core);
         core.set_data("autojoin", autojoin);
+
+        /* init/setup */
+        {
+            var buf = get_named_buffer(core, "\\ROOT\\");
+            buf.set_data("header", header);
+        }
+
         /* Now switch view.. */
         sidebar.select_row(header);
 
@@ -983,6 +993,23 @@ window.
                 this.destroy();
                 return;
             }
+            if (roots.size() - 1 == 0) {
+                side_reveal.set_reveal_child(false);
+                side_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_RIGHT);
+                insert_disclaimer(); // revert view.
+            }
+            core = root.get_data("icore");
+            core.quit(QUIT_MESSAGE);
+            sidebar.remove_expandable(root);
+            roots.remove(core);
+            string id = @"$(core.id)\\ROOT\\";
+            buffers.remove(id);
+
+            if (core == this.core ){
+                core = null;
+                this.core = null;
+            }
+            update_actions();
             // TODO: Add support to close/disconnect servers!
             return;
         }

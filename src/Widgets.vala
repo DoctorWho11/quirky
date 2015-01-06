@@ -227,6 +227,29 @@ public class SidebarExpandable : Gtk.Box
         selected = true;
     }
 
+    public void select_first_item()
+    {
+        /* First item is always us.. */
+        activated();
+        clicked();
+        selected = true;
+    }
+
+    public void select_last_item()
+    {
+        SidebarItem? item = null;
+        if (items.length()  >= 1) {
+            item = items.nth_data(items.length()-1);
+            select_item(item);
+            item.activate();
+            return;
+        }
+        selected_item = null;
+        activated();
+        clicked();
+        selected = true;
+    }
+
     public bool handle_mouse(Gtk.Widget? source_widget, Gdk.EventButton button) {
         if (source_widget.get_type() == typeof(SidebarItem)) {
            select_item((SidebarItem)source_widget);
@@ -412,11 +435,13 @@ public class IrcSidebar : Gtk.Box
 
     private weak SidebarExpandable? selected_row;
     private bool we_change = false;
+    private List<SidebarExpandable> rows;
 
     public IrcSidebar()
     {
         Object(orientation: Gtk.Orientation.VERTICAL);
         selected_row = null;
+        rows = new List<SidebarExpandable>();
     }
 
     public void select_row(SidebarExpandable? row)
@@ -461,6 +486,40 @@ public class IrcSidebar : Gtk.Box
             selected_row.activate();
         }
 
+        exp.set_data("index", rows.length());
+        rows.append(exp);
         return exp;
+    }
+
+    public void remove_expandable(SidebarExpandable exp)
+    {
+        remove(exp);
+        SidebarExpandable? target = null;
+
+        int index = exp.get_data("index");
+
+        if (rows.length()-1 == 0) {
+            /* screwed. */
+            return;
+        }
+
+        // choose previous first if we can, otherwise next
+        if (index-1 >= 0) {
+            target = rows.nth_data(index-1);
+            target.select_last_item();
+        } else {
+            target = rows.nth_data(index+1);
+            target.select_first_item();
+        }
+
+        /* move chain down */
+        if (index < rows.length()) {
+            for (int i = index+1; i < rows.length(); i++) {
+                var old = rows.nth_data(i);
+                old.set_data("index", i-1);
+            }
+        }
+
+        rows.remove(exp);
     }
 }
