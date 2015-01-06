@@ -509,7 +509,7 @@ public class IrcTextWidget : Gtk.TextView
             buf.insert_with_tags_by_name(i, "\n", -1, "default");
   
             /* Process URLs */
-            var urls = get_urls(message);
+            var urls = get_urls(demirc(message));
             if (urls.length > 0) {
                 foreach (var url in urls) {
                     Gtk.TextIter s;
@@ -623,6 +623,60 @@ public class IrcTextWidget : Gtk.TextView
             }
         } catch (Error e) {} 
         return ret;
+    }
+
+    private string demirc(string input)
+    {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < input.length; i++) {
+            unichar c = input.get_char(i);
+            switch (c) {
+                case MCS.BOLD:
+                case MCS.ITALIC:
+                case MCS.UNDERLINE:
+                case MCS.REVERSE:
+                case MCS.RESET:
+                    break;
+                case MCS.COLOR:
+                    int j;
+                    int nums = 0;
+                    bool comma = false;
+                    int lside = 0;
+                    int rside = 0;
+                    for (j = i+1; j < input.length; j++) {
+                        c = input.get_char(j);
+                        if (c.isdigit()) {
+                            if (!comma) {
+                                lside++;
+                            } else {
+                                rside++;
+                            }
+                        } else if (c == ',') {
+                            if (j+1 < input.length && !input.get_char(j+1).isdigit()) {
+                                j--;
+                                break;
+                            }
+                            comma = true;
+                        } else {
+                            j--;
+                            break;
+                        }
+                        if (!comma && lside > 2) {
+                            j--;
+                            break;
+                        } else if (comma && rside > 2) {
+                            j--;
+                            break;
+                        }
+                    }
+                    i = j;
+                    break;
+                default:
+                    b.append_unichar(c);
+                    break;
+            }
+        }
+        return b.str;
     }
 
     /**
