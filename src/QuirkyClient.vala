@@ -601,6 +601,7 @@ window.
             server = true,
             offline = true
         };
+
         /* actions.. */
         var btn = new Gtk.MenuButton();
         btn.margin_left = 6;
@@ -727,6 +728,7 @@ window.
         });
         nick_button.set_sensitive(false);
         input = new IrcTextEntry();
+        input.set_completion_func(this.handle_completion);
         input.activate.connect(send_text);
         bottom.pack_end(input, true, true, 0);
 
@@ -763,6 +765,27 @@ window.
             show_connect_dialog();
             return false;
         });*/
+    }
+
+    /**
+     * Tab completion handling
+     */
+    private string[]? handle_completion(string prefix, string line)
+    {
+        string[] ret;
+
+        /* Just handle /commands for now
+         * NOTE: Only handling / if the *line* starts with it. */
+        if (!line.has_prefix("/")) {
+            return null;
+        }
+        ret = {};
+        commands.foreach((k,v)=> {
+            if (("/" + k.down()).has_prefix(prefix.down())) {
+                ret += "/" + k;
+            }
+        });
+        return ret;
     }
 
     private void update_nick(IrcCore core)
