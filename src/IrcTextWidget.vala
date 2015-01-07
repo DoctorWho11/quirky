@@ -363,8 +363,6 @@ public class IrcTextWidget : Gtk.TextView
 
         lines = _print_formatted(format, va);
         foreach (var message in lines) {
-            unichar n;
-
             StringBuilder b = new StringBuilder();
             TmpIter[] iters = {};
 
@@ -445,7 +443,6 @@ public class IrcTextWidget : Gtk.TextView
                     case MCS.COLOR:
                         StringBuilder tbuf = new StringBuilder();
                         int k = i;
-                        int sk = i;
                         bool comma = false;
                         int lside = 0;
                         int rside = 0;
@@ -716,7 +713,6 @@ public class IrcTextWidget : Gtk.TextView
                     break;
                 case MCS.COLOR:
                     int j;
-                    int nums = 0;
                     bool comma = false;
                     int lside = 0;
                     int rside = 0;
