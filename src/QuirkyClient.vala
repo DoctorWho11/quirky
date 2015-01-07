@@ -336,6 +336,16 @@ window.
             }
             main_view.add_message(buf, null, _M(MSG.TOPIC), c, t);
         });
+        core.topic_who.connect((c,u,s)=> {
+            var buf = get_named_buffer(core, c, false);
+            if (buf == null) {
+                buf = get_named_buffer(core, "\\ROOT\\");
+            }
+            var date = new DateTime.from_unix_local(s);
+            var datef = date.format("%x %X");
+            /* need to format date at some point. */
+            main_view.add_message(buf, null, _M(MSG.TOPIC_WHO), c, u.nick, u.username, u.hostname, datef);
+        });
     }
 
     private string? id_to_channel(IrcCore c, string id)

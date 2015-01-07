@@ -128,6 +128,7 @@ public class IrcCore : Object
     public signal void connecting(IrcConnectionStatus status, string host, int port, string message);
 
     public signal void topic(string channel, string topic);
+    public signal void topic_who(string channel, IrcUser who, int64 timestamp);
 
     /**
      * Emitted when a known extension is enabled
@@ -784,6 +785,18 @@ public class IrcCore : Object
                 string[] params;
                 parse_simple(sender, remnant, null, out params, out msg);
                 topic(params[1], msg);
+                break;
+            case IRC.RPL_TOPICWHOTIME:
+                string[] params;
+                IrcUser who;
+                /* Cheating, shows the need here for validation later.. */
+                parse_simple(sender, remnant + " :", null, out params, null);
+                if (params.length < 4) {
+                    break;
+                }
+                who = user_from_hostmask(params[2]);
+                int64 stamp = int64.parse(params[3]);
+                topic_who(params[1], who, stamp);
                 break;
             default:
                 break;

@@ -17,6 +17,7 @@ public class MSG
     public static const string YOU_JOIN     = "you_join";
 
     public static const string TOPIC        = "topic";
+    public static const string TOPIC_WHO    = "topic_who";
     public static const string PART         = "part";
     public static const string PART_R       = "part_reason";
     public static const string YOU_PART     = "you_part";
