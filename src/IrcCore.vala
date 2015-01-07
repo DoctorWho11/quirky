@@ -112,6 +112,13 @@ public class IrcCore : Object
     public static int64 sid = 0;
     public int64 id;
 
+    /**
+     * 500ms for first read, otherwise force sending of nick to begin negotiation.
+     * Basically ensures we work when CAP LS failed.
+     */
+    const uint READ_TIMEOUT = 500;
+    bool got_line = false;
+
     /* State tracking. */
     private string _motd;
 
@@ -338,8 +345,15 @@ public class IrcCore : Object
             var dis = new DataInputStream(stream);
             /* Now we loop. */
             string line = null;
+            Timeout.add(READ_TIMEOUT, ()=> {
+                if (!got_line && !registered) {
+                    register();
+                }
+                return false;
+            });
             while ((line = yield dis.read_line_async(Priority.DEFAULT, cancel)) != null) {
                 yield handle_line(line);
+                got_line = true;
                 if (!registered) {
                     register();
                 }
