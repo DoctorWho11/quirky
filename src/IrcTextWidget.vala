@@ -379,8 +379,8 @@ public class IrcTextWidget : Gtk.TextView
             TmpIter c_tmpb = TmpIter();
             TmpIter c_tmpf = TmpIter();
 
-            for (int i = 0, r=0; i < message.length; i++) {
-                unichar c = message.get_char(i);
+            for (int i = 0, r=0; i < message.char_count(); i++) {
+                unichar c = message.get_char(message.index_of_nth_char(i));
                 switch (c) {
                     case MCS.BOLD:
                         if (!bold) {
@@ -449,9 +449,9 @@ public class IrcTextWidget : Gtk.TextView
                         bool comma = false;
                         int lside = 0;
                         int rside = 0;
-                        if (k+1 < message.length) {
-                            for (k = i+1; k < message.length; k++) {
-                                c = message.get_char(k);
+                        if (k+1 < message.char_count()) {
+                            for (k = i+1; k < message.char_count(); k++) {
+                                c = message.get_char(message.index_of_nth_char(k));
                                 if (c.isdigit()) {
                                     if (!comma) {
                                         lside++;
@@ -459,7 +459,7 @@ public class IrcTextWidget : Gtk.TextView
                                         rside++;
                                     }
                                 } else if (c == ',') {
-                                    if (k+1 < message.length && !message.get_char(k+1).isdigit()) {
+                                    if (k+1 < message.char_count() && !message.get_char(message.index_of_nth_char(k+1)).isdigit()) {
                                         k--;
                                         break;
                                     }
@@ -705,8 +705,8 @@ public class IrcTextWidget : Gtk.TextView
     private string demirc(string input)
     {
         StringBuilder b = new StringBuilder();
-        for (int i = 0; i < input.length; i++) {
-            unichar c = input.get_char(i);
+        for (int i = 0; i < input.char_count(); i++) {
+            unichar c = input.get_char(input.index_of_nth_char(i));
             switch (c) {
                 case MCS.BOLD:
                 case MCS.ITALIC:
@@ -720,8 +720,8 @@ public class IrcTextWidget : Gtk.TextView
                     bool comma = false;
                     int lside = 0;
                     int rside = 0;
-                    for (j = i+1; j < input.length; j++) {
-                        c = input.get_char(j);
+                    for (j = i+1; j < input.char_count(); j++) {
+                        c = input.get_char(input.index_of_nth_char(j));
                         if (c.isdigit()) {
                             if (!comma) {
                                 lside++;
@@ -729,7 +729,7 @@ public class IrcTextWidget : Gtk.TextView
                                 rside++;
                             }
                         } else if (c == ',') {
-                            if (j+1 < input.length && !input.get_char(j+1).isdigit()) {
+                            if (j+1 < input.char_count() && !input.get_char(input.index_of_nth_char(j+1)).isdigit()) {
                                 j--;
                                 break;
                             }
@@ -792,13 +792,13 @@ public class IrcTextWidget : Gtk.TextView
 
         string[] ret = {};
 
-        for (int i = 0; i < fmt.length; i++) {
-            var c = fmt.get_char(i);
+        for (int i = 0; i < fmt.char_count(); i++) {
+            var c = fmt.get_char(fmt.index_of_nth_char(i));
             switch (c) {
                 case '$':
                     /* Indexed argument follows.. */
-                    assert(i+1 <= fmt.length);
-                    unichar j = fmt.get_char(i+1);
+                    assert(i+1 <= fmt.char_count());
+                    unichar j = fmt.get_char(fmt.index_of_nth_char(i+1));
                     i++;
                     if (j.isdigit()) {
                         int index = int.parse(j.to_string());
@@ -823,8 +823,8 @@ public class IrcTextWidget : Gtk.TextView
                     break;
                 case '%':
                     /* colours */
-                    assert(i+1 <= fmt.length);
-                    unichar j = fmt.get_char(i+1);
+                    assert(i+1 <= fmt.char_count());
+                    unichar j = fmt.get_char(fmt.index_of_nth_char(i+1));
                     if (j == '%') {
                         b.append_unichar(j);
                         i++;
