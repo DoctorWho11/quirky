@@ -53,6 +53,9 @@ public class QuirkyClient : Gtk.ApplicationWindow
     Gtk.Revealer nick_reveal;
     Gtk.Revealer side_reveal;
 
+    const string ADDRESSING_CHAR = ",";
+
+
     /** Store our client messages.. */
     HashTable<string,string> _messages;
 
@@ -774,9 +777,10 @@ window.
      * @param channel Channel to search
      * @param prefix Prefix to match against
      * @param store Where to store the results
+     * @param line_start If its at the start of the line, use an addressing suffix
      * @param limit Maximum number of results to return
      */
-    private void complete_nicks(IrcCore c, string channel, string prefix, ref string[] store, int limit = 10)
+    private void complete_nicks(IrcCore c, string channel, string prefix, ref string[] store, bool line_start, int limit = 10)
     {
         string[] ret = {};
         var nlist = get_nicklist(core, channel, false);
@@ -789,7 +793,11 @@ window.
             string nick;
             nlist.get(iter,  0, out nick, -1);
             if (nick.down().has_prefix(prefix.down())) {
-                ret += nick;
+                if (line_start) {
+                    ret += nick + ADDRESSING_CHAR;
+                } else {
+                    ret += nick;
+                }
             }
             if (ret.length == limit) {
                 break;
@@ -810,11 +818,15 @@ window.
 
         if (this.core != null && this.target != null) {
             if (this.is_channel) {
-                complete_nicks(this.core, this.target, prefix, ref ret);
+                complete_nicks(this.core, this.target, prefix, ref ret, prefix == line);
             } else {
                 /* PM, add users nick */
                 if (this.target.down().has_prefix(prefix.down())) {
-                    ret += target;
+                    if (prefix == line) {
+                        ret += target + ADDRESSING_CHAR;
+                    } else {
+                        ret += target;
+                    }
                 }
             }
         }
