@@ -813,9 +813,22 @@ window.
                 complete_nicks(this.core, this.target, prefix, ref ret);
             } else {
                 /* PM, add users nick */
-                ret += target;
+                if (this.target.down().has_prefix(prefix.down())) {
+                    ret += target;
+                }
             }
         }
+
+        /* Add joined channels to completion */
+        if (this.core != null) {
+            nicklists.foreach((cid,l)=> {
+                string? c = id_to_channel(core, cid);
+                if (c != null && c.down().has_prefix(prefix.down())) {
+                    ret += c;
+                }
+            });
+        }
+
         /* Just handle /commands for now
          * NOTE: Only handling / if the *line* starts with it. */
         if (line.has_prefix("/")) {
