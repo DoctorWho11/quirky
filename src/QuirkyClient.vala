@@ -808,7 +808,7 @@ window.
     {
         string[] ret = {};
 
-        if (this.core != null && this.is_channel) {
+        if (this.core != null && this.target != null && this.is_channel) {
             complete_nicks(this.core, this.target, prefix, ref ret);
         }
         /* Just handle /commands for now
