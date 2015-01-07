@@ -768,23 +768,58 @@ window.
     }
 
     /**
+     * Return a matched set of nicks for the given prefix
+     *
+     * @param c The relevant IrcCore
+     * @param channel Channel to search
+     * @param prefix Prefix to match against
+     * @param store Where to store the results
+     * @param limit Maximum number of results to return
+     */
+    private void complete_nicks(IrcCore c, string channel, string prefix, ref string[] store, int limit = 10)
+    {
+        string[] ret = {};
+        var nlist = get_nicklist(core, channel, false);
+        if (nlist == null) {
+            return;
+        }
+        Gtk.TreeIter iter;
+        nlist.get_iter_first(out iter);
+        while (true) {
+            string nick;
+            nlist.get(iter,  0, out nick, -1);
+            if (nick.down().has_prefix(prefix.down())) {
+                ret += nick;
+            }
+            if (ret.length == limit) {
+                break;
+            }
+            if (!nlist.iter_next(ref iter)) {
+                break;
+            }
+        }
+        store = ret;
+    }
+
+    /**
      * Tab completion handling
      */
     private string[]? handle_completion(string prefix, string line)
     {
-        string[] ret;
+        string[] ret = {};
 
+        if (this.core != null && this.is_channel) {
+            complete_nicks(this.core, this.target, prefix, ref ret);
+        }
         /* Just handle /commands for now
          * NOTE: Only handling / if the *line* starts with it. */
-        if (!line.has_prefix("/")) {
-            return null;
+        if (line.has_prefix("/")) {
+            commands.foreach((k,v)=> {
+                if (("/" + k.down()).has_prefix(prefix.down())) {
+                    ret += "/" + k;
+                }
+            });
         }
-        ret = {};
-        commands.foreach((k,v)=> {
-            if (("/" + k.down()).has_prefix(prefix.down())) {
-                ret += "/" + k;
-            }
-        });
         return ret;
     }
 
