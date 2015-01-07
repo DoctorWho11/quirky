@@ -210,6 +210,8 @@ window.
                         nick_list.set_model(nlist);
                         nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
                         nick_reveal.set_reveal_child(true);
+                        item.count.count = 0;
+                        item.count.priority = CountPriority.NORMAL;
                     });
                     buf = tbuf;
                 } else {
@@ -1002,6 +1004,8 @@ window.
         update_nick(core);
         nick_reveal.set_reveal_child(false);
         nick_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT);
+        item.count.count = 0;
+        item.count.priority = CountPriority.NORMAL;
         this.is_channel = false;
     }
 
@@ -1104,6 +1108,16 @@ window.
         main_view.scroll_to_bottom(buffer);
     }
 
+    private bool is_highlight(IrcCore core, string message)
+    {
+        /* prevent modification of ident */
+        var name = core.ident.nick;
+        if (name.down() in message.down()) {
+            return true;
+        }
+        return false;
+    }
+
     protected void on_messaged(IrcCore core, IrcUser user, string target, string message, IrcMessageType type)
     {
         Gtk.TextBuffer? buffer;
@@ -1112,8 +1126,24 @@ window.
             /* private message.. */
             buffer = get_named_buffer(core, user.nick);
             ensure_view(core, buffer, user.nick);
+            if (user.nick != this.target) {
+                /* Update badge */
+                SidebarItem? item = buffer.get_data("sitem");
+                item.count.count++;
+                /* Add better highlighting logic in future */
+                if (is_highlight(core, message)) {
+                    item.count.priority = CountPriority.HIGH;
+                }
+            }
         } else {
             buffer = get_named_buffer(core, target);
+            if (target != this.target) {
+                SidebarItem? item = buffer.get_data("sitem");
+                item.count.count++;
+                if (is_highlight(core, message)) {
+                    item.count.priority = CountPriority.HIGH;
+                }
+            }
         }
         if ((type & IrcMessageType.ACTION) != 0) {
             main_view.add_message(buffer, user.nick, _M(MSG.ACTION), user.nick, message);
