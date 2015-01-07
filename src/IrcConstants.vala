@@ -17,6 +17,10 @@ public enum IRC {
     RPL_NAMREPLY = 353, /* Name list */
     RPL_ENDOFNAMES = 366, /* End of names list */
 
+    RPL_NOTOPIC = 332,
+    RPL_TOPIC = 332,
+    RPL_TOPICWHOTIME = 333,
+
     /* Nickname errors */
     ERR_NONICKNAMEGIVEN = 431, /* Duh. */
     ERR_ERRONEUSNICKNAME =  432, /* Invalid nickname (/NICK) */

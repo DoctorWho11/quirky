@@ -328,6 +328,14 @@ window.
                 }
             });
         });
+        core.topic.connect((c,t)=> {
+            /* joined, or requested. */
+            var buf = get_named_buffer(core, c, false);
+            if (buf == null) {
+                buf = get_named_buffer(core, "\\ROOT\\");
+            }
+            main_view.add_message(buf, null, _M(MSG.TOPIC), c, t);
+        });
     }
 
     private string? id_to_channel(IrcCore c, string id)

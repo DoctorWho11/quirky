@@ -127,6 +127,8 @@ public class IrcCore : Object
 
     public signal void connecting(IrcConnectionStatus status, string host, int port, string message);
 
+    public signal void topic(string channel, string topic);
+
     /**
      * Emitted when a known extension is enabled
      */
@@ -776,6 +778,12 @@ public class IrcCore : Object
                 string[] params;
                 parse_simple(sender, remnant, null, out params, out msg);
                 nick_error(params.length > 1 ? params[1] : ident.nick, IrcNickError.COLLISION, msg);
+                break;
+            case IRC.RPL_TOPIC:
+                string msg;
+                string[] params;
+                parse_simple(sender, remnant, null, out params, out msg);
+                topic(params[1], msg);
                 break;
             default:
                 break;
