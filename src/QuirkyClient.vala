@@ -450,6 +450,17 @@ window.
         _messages = new HashTable<string,string>(str_hash,str_equal);
         init_messages();
 
+        {
+            try {
+                var f = File.new_for_uri("resource://com/evolve_os/irc_client/style.css");
+                var css = new Gtk.CssProvider();
+                css.load_from_file(f);
+                Gtk.StyleContext.add_provider_for_screen(screen, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            } catch (Error e) {
+                warning("CSS initialisation error: %s", e.message);
+            }
+        }
+
         header = new Gtk.HeaderBar();
         header.set_show_close_button(true);
         set_title("Quirky");

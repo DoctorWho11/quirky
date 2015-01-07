@@ -1,0 +1,15 @@
+.count-item {
+    background-color: @selected_bg_color;
+    border-radius: 5px;
+    color: @selected_fg_color;
+    padding: 4px;
+    border: none;
+}
+
+.count-item.urgent {
+    background-color: red;
+}
+
+.count-item.non-urgent {
+    background-color: grey;
+}

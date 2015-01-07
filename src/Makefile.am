@@ -41,6 +41,7 @@ dummy_bot_VALAFLAGS = \
 quirky_SOURCES = \
 	client-resources.h \
 	client-resources.c \
+	CountItem.vala \
 	IrcConstants.vala \
 	IrcCore.vala \
 	IrcTextWidget.vala \

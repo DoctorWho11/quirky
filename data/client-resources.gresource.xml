@@ -3,5 +3,6 @@
         <gresource prefix="/com/evolve_os/irc_client">
                 <file>servers.conf</file>
                 <file>messages.conf</file>
+                <file>style.css</file>
         </gresource>
 </gresources>

@@ -59,6 +59,8 @@ public class SidebarItem : Gtk.EventBox
         }
     }
 
+    public CountItem count { public get ; private set; }
+
     public string icon_name {
         public set {
             img.set_from_icon_name(value, Gtk.IconSize.BUTTON);
@@ -118,6 +120,9 @@ public class SidebarItem : Gtk.EventBox
         box.pack_start(img, false, false, 0);
         img.margin = 5;
         box.pack_start(l, true, true, 0);
+
+        count = new CountItem();
+        box.pack_end(count, false, false, 0);
 
         show_all();
     }
