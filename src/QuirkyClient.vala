@@ -1227,7 +1227,7 @@ window.
     {
         var line = iline.substring(1);
 
-        var p = line.split(" ");
+        var p = line.strip().split(" ");
         var cmd = p[0].down();
         if (!(cmd in commands)) {
             add_error(main_view.buffer, "Unknown command: %s", cmd);
