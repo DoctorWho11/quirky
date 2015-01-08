@@ -323,7 +323,14 @@ public class IrcCore : Object
                 client.event.connect(on_client_event);
             }
 
-            var resolv = addr.to_string();
+            /* Reverse the lookup so people know *where* they're connecting (round robins) */
+            string resolv = addr.to_string();
+            try {
+                resolv = yield r.lookup_by_address_async(addr, cancel);
+            } catch (Error e) {
+                warning("Failed to perform reverse lookup of %s", resolv);
+            }
+
             connecting(IrcConnectionStatus.CONNECTING, resolv, (int)port, @"Connecting to $(host)... ($(resolv):$(port))");
             var connection = yield client.connect_async(sock_addr, cancel);
             (connection as TcpConnection).set_graceful_disconnect(true);
