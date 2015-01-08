@@ -413,7 +413,7 @@ public class IrcTextWidget : Gtk.TextView
 
     bool custom_font = false;
 
-    public IrcTextWidget()
+    public IrcTextWidget(HashTable<string,string> colors)
     {
         set_wrap_mode(Gtk.WrapMode.WORD_CHAR);
         set_cursor_visible(false);
@@ -451,35 +451,21 @@ public class IrcTextWidget : Gtk.TextView
         tag.invisible = true;
         tags.add(tag);
 
-        /* default colors palette (m0-15) */
-        string[,] palette = {
-            { "white", "white" },
-            { "black", "black" },
-            { "blue", "blue" },
-            { "green", "green" },
-            { "red", "red" },
-            { "brown", "brown" },
-            { "purple", "purple" },
-            { "orange", "orange" },
-            { "yellow", "yellow" },
-            { "lightgreen", "lightgreen" },
-            { "teal", "teal" },
-            { "cyan", "cyan" },
-            { "lightblue", "lightblue" },
-            { "pink", "pink" },
-            { "grey", "grey" },
-            { "lightgrey", "lightgrey" }
-        };
-
         mcols = new HashTable<int,string>(direct_hash, direct_equal);
-        for (int i = 0; i < palette.length[0]; i++) {
-            tag = new Gtk.TextTag("m_" + palette[i,0]);
-            tag.foreground = palette[i,1];
-            tags.add(tag);
-            tag = new Gtk.TextTag("mb_" + palette[i,0]);
-            tag.background = palette[i,1];
-            tags.add(tag);
-            mcols[i] = palette[i,0];
+        for (int i = 0; i < 99; i++) {
+            var color = colors.lookup(@"color_$(i)");
+            if (color == null) {
+                color = "black";
+            }
+            if (tags.lookup("m_" + color) == null) {
+                tag = new Gtk.TextTag("m_" + color);
+                tag.foreground = color;
+                tags.add(tag);
+                tag = new Gtk.TextTag("mb_" + color);
+                tag.background = color;
+                tags.add(tag);
+            }
+            mcols[i] = color;
         }
 
         tag = new Gtk.TextTag("mbold");
@@ -528,7 +514,7 @@ public class IrcTextWidget : Gtk.TextView
     int get_nick_color(string whom)
     {
         /* Don't ever use white/black */
-        int nick_index = (int) (whom.hash() % mcols.size());
+        int nick_index = (int) (whom.hash() % 15);
         if (nick_index < 2) {
             nick_index = 2;
         }

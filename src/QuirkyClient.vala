@@ -58,6 +58,7 @@ public class QuirkyClient : Gtk.ApplicationWindow
 
     /** Store our client messages.. */
     HashTable<string,string> _messages;
+    HashTable<string,string> _colors;
 
     const string VOICE_ICON = "non-starred-symbolic";
     const string HALFOP_ICON = "semi-starred-symbolic";
@@ -475,6 +476,18 @@ window.
                 }
                 _messages[key] = s;
             }
+
+            foreach (var key in ini.get_keys("Colors")) {
+                var s = ini.get_string("Colors", key).strip();
+                if (" " in s) {
+                    s = s.replace(" ", "");
+                    if (!s.has_prefix("#")) {
+                        s = "#" + s;
+                    }
+                }
+                _colors[key] = s;
+                message("Color %s = %s", s, s);
+            }
         } catch (Error e) {
             message("MISSING MESSAGES CONFIG: %s", e.message);
             /* Coredumping is so last century. */
@@ -510,6 +523,7 @@ window.
 
 
         _messages = new HashTable<string,string>(str_hash,str_equal);
+        _colors = new HashTable<string,string>(str_hash,str_equal);
         init_messages();
 
         {
@@ -529,7 +543,7 @@ window.
         set_titlebar(header);
         header.set_title("Quirky");
 
-        main_view = new IrcTextWidget();
+        main_view = new IrcTextWidget(_colors);
 
         commands = new HashTable<string,Command?>(str_hash, str_equal);
         /* Handle /me action */
