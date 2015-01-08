@@ -486,7 +486,6 @@ window.
                     }
                 }
                 _colors[key] = s;
-                message("Color %s = %s", s, s);
             }
         } catch (Error e) {
             message("MISSING MESSAGES CONFIG: %s", e.message);
@@ -711,6 +710,7 @@ window.
                     core.join_channel(dlg.response_text);
                 }
                 dlg.destroy();
+                input.grab_focus();
                 return false;
             });
         });
@@ -783,6 +783,7 @@ window.
         bottom.get_style_context().add_class("linked");
         layout.pack_end(bottom, false, false, 0);
         nick_button = new Gtk.ToggleButton.with_label("");
+        nick_button.set_can_focus(false);
         bottom.pack_start(nick_button, false, false, 0);
 
         /* Shmancy. Popover to change nickname =) */
@@ -845,6 +846,11 @@ window.
 
         set_default_size(800, 550);
         window_position = Gtk.WindowPosition.CENTER;
+
+        input.set_can_default(true);
+        input.grab_default();
+        this.set_default(input);
+        input.grab_focus();
 
         insert_disclaimer();
         /*
@@ -1117,6 +1123,7 @@ window.
             connect_server(dlg.host, dlg.port, dlg.ssl, dlg.channel, ident);
         }
         dlg.destroy();
+        input.grab_focus();
     }
 
     /**
