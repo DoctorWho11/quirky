@@ -580,6 +580,19 @@ window.
             max_params = 1,
             server = true
         };
+        commands["msg"] = Command() {
+            cb = (line)=> {
+                var splits = line.split(" ");
+                var target = splits[0];
+                var message = string.joinv(" ", splits[1:splits.length]);
+                main_view.add_message(main_view.buffer, target, _M(MSG.PM), core.ident.nick, target, message);
+                core.send_message(target, message);
+            },
+            help = "<user> <message>, send a message to a user without opening a new view",
+            min_params = 2,
+            max_params = -1,
+            server = true
+        };
         /* Part from a channel */
         commands["part"] = Command() {
             cb = (line)=> {

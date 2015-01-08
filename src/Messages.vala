@@ -29,6 +29,7 @@ public class MSG
     public static const string ACTION           = "action";
 
     public static const string MESSAGE          = "message";
+    public static const string PM               = "pm";
     public static const string CHANNEL_NOTICE   = "channel_notice";
     public static const string NOTICE           = "notice";
     public static const string QUIT             = "quit";
