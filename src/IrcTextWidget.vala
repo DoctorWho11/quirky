@@ -200,7 +200,7 @@ public class IrcTextEntry : Gtk.Entry
                 for (i = pos-1; i > 0; i--) {
                     unichar c = txt.get_char(txt.index_of_nth_char(i));
                     if (c == ' ') {
-                        cmd = txt.substring(txt.length-(pos-i), pos-i);
+                        cmd = txt.substring(txt.length-(txt.length-i), pos-i);
                         spaced = true;
                         ++i;
                         break;
@@ -211,10 +211,11 @@ public class IrcTextEntry : Gtk.Entry
                     i = 0;
                     cmd = txt.substring(0, pos);
                 }
-                if (cmd == " " || cmd.length == 0) {
+                cmd = cmd.strip();
+
+                if (cmd.length == 0) {
                     return Gdk.EVENT_STOP;
                 }
-                cmd = cmd.strip();
 
                 if (this.func == null) {
                     return Gdk.EVENT_STOP;
@@ -222,11 +223,13 @@ public class IrcTextEntry : Gtk.Entry
                 var c = this.func(cmd,get_text());
 
                 if (c.length == 1) {
-                    /* We like inserting spaces. */
-                    string txtt = get_text().substring(0,i);
-                    txtt += " " + c[0];
+                    string txtt = txt.substring(0,txt.length-(txt.length-i));
+                    txtt += c[0];
+                    int len = txtt.length;
+                    string remnant = txt.substring(pos, txt.length-pos);
+                    txtt += " " + remnant;
                     set_text(txtt);
-                    set_position(txtt.length);
+                    set_position(len);
                 } else if (c.length > 1) {
                     cycle_prefix = get_text().substring(0,i);
                     cycling = true;
