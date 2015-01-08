@@ -78,6 +78,7 @@ public class IrcTextEntry : Gtk.Entry
     int cycle_index = 0;
     string[] current_completions = {};
     string cycle_prefix;
+    string cycle_suffix;
     bool cycling = false;
 
     weak IrcEntryCompleteFunc func;
@@ -185,9 +186,11 @@ public class IrcTextEntry : Gtk.Entry
                 break;
             case "Tab":
                 if (cycling) {
-                    string ntext = cycle_prefix + current_completions[cycle_index%current_completions.length] + " ";
+                    string ntext = cycle_prefix + current_completions[cycle_index%current_completions.length];
+                    int len = ntext.length;
+                    ntext += " " + cycle_suffix;
                     set_text(ntext);
-                    set_position(ntext.length);
+                    set_position(len);
                     cycle_index += 1;
                     return Gdk.EVENT_STOP;
                 }
@@ -226,17 +229,21 @@ public class IrcTextEntry : Gtk.Entry
                     string txtt = txt.substring(0,txt.length-(txt.length-i));
                     txtt += c[0];
                     int len = txtt.length;
-                    string remnant = txt.substring(pos, txt.length-pos);
+                    string remnant = pos < txt.length ? txt.substring(pos, txt.length-pos) : "";
                     txtt += " " + remnant;
                     set_text(txtt);
                     set_position(len);
                 } else if (c.length > 1) {
-                    cycle_prefix = get_text().substring(0,i);
-                    cycling = true;
+                    cycle_prefix = txt.substring(0,txt.length-(txt.length-i));
                     current_completions = c;
-                    string ntext = cycle_prefix + current_completions[cycle_index%current_completions.length] + " ";
-                    set_text(ntext);
-                    set_position(ntext.length);
+                    string txtt = cycle_prefix + current_completions[cycle_index%current_completions.length] + " ";
+                    int len = txtt.length;
+                    cycle_suffix = pos < txt.length ? txt.substring(pos, txt.length-pos) : "";
+                    txtt += " " + cycle_suffix;
+                    set_text(txtt);
+                    set_position(len);
+                    current_completions = c;
+                    cycling = true;
                     cycle_index += 1;
                 }
                 return Gdk.EVENT_STOP;
