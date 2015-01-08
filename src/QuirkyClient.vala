@@ -1530,7 +1530,7 @@ public class ConnectDialog : Gtk.Dialog
         entry.hexpand = true;
         channel_entry = entry;
         channel_entry.changed.connect(()=> {
-            channel = entry.text;
+            channel = channel_entry.text;
         });
         channel_entry.activate.connect(()=> {
             do_validate(true);
