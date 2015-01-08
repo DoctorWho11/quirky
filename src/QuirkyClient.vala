@@ -1279,6 +1279,13 @@ window.
         string longest_nick = buffer.get_data("longestnick");
         main_view.update_tabs(buffer, longest_nick != null ? longest_nick : core.ident.nick);
         main_view.scroll_to_bottom(buffer);
+
+        IrcEntryLog? log = buffer.get_data("irclog");
+        if (log == null) {
+            log = new IrcEntryLog();
+            buffer.set_data("irclog", log);
+        }
+        input.set_log(log);
     }
 
     private bool is_highlight(IrcCore core, string message)

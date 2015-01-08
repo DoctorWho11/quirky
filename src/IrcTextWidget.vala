@@ -159,11 +159,13 @@ public class IrcTextEntry : Gtk.Entry
             return Gdk.EVENT_STOP;
         }
 
+        bool log_switch = false;
         switch (name) {
             case "Up":
                 if (log == null) {
                     break;
                 }
+                log_switch = true;
                 string? item = log.items.peek_nth(++log.cmd_index);
                 if (item == null) {
                     log.cmd_index = (int)log.items.length;
@@ -175,6 +177,7 @@ public class IrcTextEntry : Gtk.Entry
                 if (log == null) {
                     break;
                 }
+                log_switch = true;
                 string? item = log.items.peek_nth(--log.cmd_index);
                 if (item == null) {
                     log.cmd_index = -1;
@@ -258,6 +261,9 @@ public class IrcTextEntry : Gtk.Entry
         }
         if (log != null) {
             log.cmd_index = log.cmd_index.clamp(-1, (int)log.items.length-1);
+        }
+        if (log_switch) {
+            return Gdk.EVENT_STOP;
         }
         return base.key_press_event(event);
     }
