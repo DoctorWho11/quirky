@@ -300,6 +300,33 @@ window.
             var buf = get_named_buffer(core, "\\ROOT\\");
             main_view.add_message(buf, null, _M(MSG.LOGIN_FAIL), m);
         });
+        core.noticed.connect((u,t,m)=> {
+            Gtk.TextBuffer? buf = null;
+            /* server sent it */
+            if (u.nick == null) {
+                buf = get_named_buffer(core, "\\ROOT\\");
+                main_view.add_message(buf, null, _M(MSG.SERVER_NOTICE), m);
+                return;
+            }
+
+            if (t == core.ident.nick) {
+                /* We got noticed. */
+                buf = get_named_buffer(core, u.nick, false);
+                /* notice to us. */
+                if (buf == null && this.core == core) {
+                    /* send to current buffer, its a direct notice */
+                    buf = main_view.buffer;
+                }
+            } else {
+                buf = get_named_buffer(core, t, false);
+            }
+            /* Default to server buffer */
+            if (buf == null) {
+                buf = get_named_buffer(core, "\\ROOT\\");
+            }
+            main_view.add_message(buf, u.nick, t == core.ident.nick?  _M(MSG.NOTICE) : _M(MSG.CHANNEL_NOTICE), u.nick, t, m);
+        });
+
         core.nick_changed.connect((u,n,us)=> {
             if (us) {
                 update_nick(core);
@@ -1402,6 +1429,7 @@ public class ConnectDialog : Gtk.Dialog
     private Gtk.Entry nick_ent;
     private Gtk.Entry host_ent;
     private Gtk.Entry pass_entry;
+    private Gtk.Entry channel_entry;
     private Gtk.Widget con;
     private Gtk.CheckButton check;
     private Gtk.Label auth_label;
@@ -1485,10 +1513,11 @@ public class ConnectDialog : Gtk.Dialog
         grid.attach(label, column, row, norm_size, norm_size);
         entry = new Gtk.Entry();
         entry.hexpand = true;
-        entry.changed.connect(()=> {
+        channel_entry = entry;
+        channel_entry.changed.connect(()=> {
             channel = entry.text;
         });
-        entry.activate.connect(()=> {
+        channel_entry.activate.connect(()=> {
             do_validate(true);
         });
         grid.attach(entry, column+1, row, max_size-1, norm_size);

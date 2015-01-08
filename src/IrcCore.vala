@@ -1119,7 +1119,7 @@ public class IrcCore : Object
     protected IrcUser? user_from_hostmask(string hostmaskin)
     {
         IrcUser ret = IrcUser() {
-            nick = "user",
+            nick = null,
             username = "user",
             hostname = "host"
         };

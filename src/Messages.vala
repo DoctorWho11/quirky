@@ -29,10 +29,12 @@ public class MSG
     public static const string ACTION           = "action";
 
     public static const string MESSAGE          = "message";
-
+    public static const string CHANNEL_NOTICE   = "channel_notice";
+    public static const string NOTICE           = "notice";
     public static const string QUIT             = "quit";
 
     public static const string MOTD             = "motd";
+    public static const string SERVER_NOTICE    = "server_notice";
     public static const string INFO             = "info";
     public static const string DISCLAIM         = "disclaimer";
     public static const string HELP_LIST        = "help_list";
