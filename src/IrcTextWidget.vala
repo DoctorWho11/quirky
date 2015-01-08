@@ -525,14 +525,9 @@ public class IrcTextWidget : Gtk.TextView
     public void add_message(Gtk.TextBuffer buf, string? whom, string format, ...)
     {
         va_list va = va_list();
-        string last_nick = buf.get_data("_lastnick");
         string[] lines = {};
 
         insert_timestamp(buf);
-
-        if (whom == null) {
-            whom = "    ";
-        }
 
         /**
          * TODO: Think about re-adding this.
@@ -549,6 +544,14 @@ public class IrcTextWidget : Gtk.TextView
         foreach (var message in lines) {
             StringBuilder b = new StringBuilder();
             TmpIter[] iters = {};
+
+            int tindex = message.index_of("\t");
+            if (tindex > 0) {
+                var left = message.substring(0,tindex);
+                update_tabs(buf, demirc(left));
+            } else {
+                update_tabs(buf, "    ");
+            }
 
             /* Handle colours later.. */
             bool bold  = false;
@@ -780,8 +783,6 @@ public class IrcTextWidget : Gtk.TextView
                     buf.apply_tag(tag, s, e);
                 }
             }
-            buf.set_data("_lastnick", whom);
-            update_tabs(buf, whom);
 
             scroll_to_bottom(buffer);
         }
