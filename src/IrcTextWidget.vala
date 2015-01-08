@@ -247,10 +247,6 @@ public class IrcTextEntry : Gtk.Entry
                     cycle_index += 1;
                 }
                 return Gdk.EVENT_STOP;
-            /* Normal for people, let's be honest =) */
-            case "Left":
-            case "Right":
-                break;
             default:
                 if (log != null) {
                     log.cmd_index = -1;
