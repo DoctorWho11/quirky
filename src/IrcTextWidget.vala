@@ -222,12 +222,11 @@ public class IrcTextEntry : Gtk.Entry
                 var c = this.func(cmd,get_text());
 
                 if (c.length == 1) {
-                    var txt2 = c[0].substring(cmd.length);
-                    i += cmd.length;
                     /* We like inserting spaces. */
-                    txt2 += " ";
-                    insert_text(txt2, -1, ref i);
-                    set_position(i);
+                    string txtt = get_text().substring(0,i);
+                    txtt += " " + c[0];
+                    set_text(txtt);
+                    set_position(txtt.length);
                 } else if (c.length > 1) {
                     cycle_prefix = get_text().substring(0,i);
                     cycling = true;
