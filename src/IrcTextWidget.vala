@@ -193,7 +193,7 @@ public class IrcTextEntry : Gtk.Entry
                     int len = ntext.length;
                     ntext += " " + cycle_suffix;
                     set_text(ntext);
-                    set_position(len);
+                    set_position(len+1);
                     cycle_index += 1;
                     return Gdk.EVENT_STOP;
                 }
@@ -234,6 +234,9 @@ public class IrcTextEntry : Gtk.Entry
                     int len = txtt.length;
                     string remnant = pos < txt.length ? txt.substring(pos, txt.length-pos) : "";
                     txtt += " " + remnant;
+                    if (remnant.length == 0) {
+                        len += 1;
+                    }
                     set_text(txtt);
                     set_position(len);
                 } else if (c.length > 1) {
@@ -244,7 +247,7 @@ public class IrcTextEntry : Gtk.Entry
                     cycle_suffix = pos < txt.length ? txt.substring(pos, txt.length-pos) : "";
                     txtt += " " + cycle_suffix;
                     set_text(txtt);
-                    set_position(len);
+                    set_position(len+1);
                     current_completions = c;
                     cycling = true;
                     cycle_index += 1;
