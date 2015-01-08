@@ -1034,6 +1034,19 @@ window.
                 gecos = "Quirky IRC Client",
                 mode = 0
             };
+            ident.password = dlg.password;
+            switch (dlg.auth_type) {
+                case "nickserv":
+                    ident.auth =  AuthenticationMode.NICKSERV;
+                    break;
+                case "sasl":
+                    ident.auth = AuthenticationMode.SASL;
+                    break;
+                default:
+                    ident.password = null;
+                    ident.auth = AuthenticationMode.NONE;
+                    break;
+            }
             ident.nick = dlg.nickname;
             connect_server(dlg.host, dlg.port, dlg.ssl, dlg.channel, ident);
         }
@@ -1371,11 +1384,16 @@ public class ConnectDialog : Gtk.Dialog
     public bool ssl { public get; private set; }
     public string channel { public get; private set; }
     public string nickname { public get; private set; }
+    public string password { public get; private set; }
+    public string auth_type { public get; private set; }
 
     private Gtk.Entry nick_ent;
     private Gtk.Entry host_ent;
+    private Gtk.Entry pass_entry;
     private Gtk.Widget con;
     private Gtk.CheckButton check;
+    private Gtk.Label auth_label;
+    private Gtk.Entry auth_entry;
 
     public ConnectDialog(Gtk.Window parent)
     {
@@ -1386,6 +1404,8 @@ public class ConnectDialog : Gtk.Dialog
         w.get_style_context().add_class("suggested-action");
         w.set_sensitive(false);
         con = w;
+
+        auth_type = "none";
 
         var grid = new Gtk.Grid();
         int row = 0;
@@ -1461,11 +1481,47 @@ public class ConnectDialog : Gtk.Dialog
         });
         grid.attach(entry, column+1, row, max_size-1, norm_size);
 
-        grid.margin_bottom = 6;
+        row++;
+        label = new Gtk.Label("Authentication");
+        label.halign = Gtk.Align.START;
+        grid.attach(label, column, row, norm_size, norm_size);
+        var combo = new Gtk.ComboBoxText();
+        combo.append("none", "None");
+        combo.append("nickserv", "NickServ");
+        combo.append("sasl", "SASL (PLAIN)");
+        grid.attach(combo, column+1, row, max_size-1, norm_size);
+        combo.active_id = "none";
+
+        combo.changed.connect(()=> {
+            this.auth_type = combo.active_id;
+            auth_label.set_visible(combo.active_id != "none");
+            auth_entry.set_visible(combo.active_id != "none");
+            do_validate(false);
+        });
 
         get_content_area().set_border_width(10);
         get_content_area().add(grid);
         get_content_area().show_all();
+        grid.no_show_all = true;
+
+        row++;
+        label = new Gtk.Label("Password");
+        auth_label = label;
+        label.halign = Gtk.Align.START;
+        grid.attach(label, column, row, norm_size, norm_size);
+        entry = new Gtk.Entry();
+        entry.set_visibility(false);
+        auth_entry = entry;
+        entry.hexpand = true;
+        grid.attach(entry, column+1, row, max_size-1, norm_size);
+
+        pass_entry = entry;
+        pass_entry.changed.connect(()=> {
+            password = pass_entry.get_text();
+        });
+
+        grid.margin_bottom = 6;
+
     }
 
     private void do_validate(bool emit)
@@ -1517,6 +1573,10 @@ public class ConnectDialog : Gtk.Dialog
         if (host_ent.text.strip() == "") {
             con.set_sensitive(false);
             return;
+        }
+
+        if (auth_type != "none" && auth_entry.text.strip() == "") {
+            con.set_sensitive(false);
         }
 
         host = host_ent.text;

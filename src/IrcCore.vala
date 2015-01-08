@@ -43,11 +43,21 @@
  * (at your option) any later version.
  */
 
+public enum AuthenticationMode
+{
+    NONE,
+    NICKSERV,
+    SASL
+}
+
 public struct IrcIdentity {
     string username;
     string gecos;
     string nick;
     int mode;
+    string password;
+    string account_id;
+    AuthenticationMode auth;
 }
 
 public struct IrcUser {
@@ -241,6 +251,7 @@ public class IrcCore : Object
     {
         /* Todo: Validate */
         this.ident = ident;
+        this.ident.account_id = this.ident.nick;
         cancel = new Cancellable();
 
         channels = new HashTable<string,Channel>(str_hash, str_equal);
@@ -255,6 +266,10 @@ public class IrcCore : Object
 
         established.connect(()=> {
             connected = true;
+            if (ident.auth == AuthenticationMode.NICKSERV) {
+                send_message("NickServ", "IDENTIFY %s %s".printf(this.ident.account_id, this.ident.password));
+            }
+            this.ident.password = null;
         });
 
         sinfo = ServerInfo();
@@ -836,9 +851,9 @@ public class IrcCore : Object
 
     async void sasl_auth()
     {
-        /*
-        var send = sasl_plain("jimbob", "jimbob", "somepass"");
-        write_socket("AUTHENTICATE %s\r\n", send); */
+        var sasl = sasl_plain(ident.account_id, ident.account_id, ident.password);
+        write_socket("AUTHENTICATE %s\r\n", sasl);
+        ident.password = null;
     }
 
     /**
@@ -880,6 +895,11 @@ public class IrcCore : Object
                     msg = msg.strip();
                     capabilities = msg.split(" ");
                     /** Note, we don't actually request any CAPS yet. */
+
+                    if (ident.auth == AuthenticationMode.SASL && "sasl" in capabilities) {
+                        stdout.printf("debug: requesting sasl\n");
+                        cap_requests += "sasl";
+                    }
 
                     if (cap_requests.length > 0) {
                         write_socket("CAP REQ :%s\r\n", string.joinv(" ", cap_requests));
