@@ -1183,6 +1183,8 @@ window.
         }
         if (activate) {
             var root = roots[core];
+            root.set_expanded(true);
+
             root.select_item(item);
         }
     }
