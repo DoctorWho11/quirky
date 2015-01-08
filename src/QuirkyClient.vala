@@ -288,6 +288,18 @@ window.
             var buf = get_named_buffer(core, "\\ROOT\\");
             main_view.add_message(buf, null, _M(MSG.MOTD), m);
         });
+        core.logging_in.connect(()=> {
+            var buf = get_named_buffer(core, "\\ROOT\\");
+            main_view.add_message(buf, null, _M(MSG.LOGGING_IN), core.ident.account_id);
+        });
+        core.login_success.connect((a,m)=> {
+            var buf = get_named_buffer(core, "\\ROOT\\");
+            main_view.add_message(buf, null, _M(MSG.LOGIN_SUCCESS), a, m);
+        });
+        core.login_failed.connect((m)=> {
+            var buf = get_named_buffer(core, "\\ROOT\\");
+            main_view.add_message(buf, null, _M(MSG.LOGIN_FAIL), m);
+        });
         core.nick_changed.connect((u,n,us)=> {
             if (us) {
                 update_nick(core);

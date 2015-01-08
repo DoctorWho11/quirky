@@ -239,6 +239,10 @@ public class IrcCore : Object
      */
     public signal void established();
 
+    public signal void logging_in();
+    public signal void login_success(string account_name, string message);
+    public signal void login_failed(string message);
+
     /**
      * May be emitted multiple times as we recieve more RPL_ISUPPORT data from
      * the server.
@@ -267,6 +271,7 @@ public class IrcCore : Object
         established.connect(()=> {
             connected = true;
             if (ident.auth == AuthenticationMode.NICKSERV) {
+                logging_in();
                 send_message("NickServ", "IDENTIFY %s %s".printf(this.ident.account_id, this.ident.password));
             }
             this.ident.password = null;
@@ -643,12 +648,16 @@ public class IrcCore : Object
 
             /* SASL magicks. */
             case IRC.RPL_LOGGEDIN:
+                string msg;
+                string[] params;
+                parse_simple(sender, remnant, null, out params, out msg);
                 message("SASL auth success");
                 write_socket("CAP END\r\n");
                 if (to_tls) {
                     write_socket("STARTTLS\r\n");
                     to_tls = false;
                 }
+                login_success(params[2], msg);
                 break;
             case IRC.ERR_NICKLOCKED:
             case IRC.ERR_SASLFAIL:
@@ -656,12 +665,15 @@ public class IrcCore : Object
             case IRC.ERR_SASLABORTED:
             case IRC.ERR_SASLALREADY:
                 /* SASL failed, basically. */
+                string msg;
+                parse_simple(sender, remnant, null, null, out msg);
                 warning("SASL authentication failed with numeric: %d", numeric);
                 write_socket("CAP END\r\n");
                 if (to_tls) {
                     write_socket("STARTTLS\r\n");
                     to_tls = false;
                 }
+                login_failed(msg);
                 break;
             /* Server info parsing, goodie! */
             case IRC.RPL_ISUPPORT:
@@ -886,6 +898,7 @@ public class IrcCore : Object
                     write_socket("%s\r\n", send);
                     return;
                 case "AUTHENTICATE":
+                    logging_in();
                     yield sasl_auth();
                     break;
                 default:
