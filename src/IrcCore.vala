@@ -340,6 +340,10 @@ public class IrcCore : Object
                 write_socket("STARTTLS\r\n");
                 tls_pending = true;
             }
+
+            if (!use_ssl && !starttls) {
+                schedule_register();
+            }
             yield _irc_loop();
         } catch (Error e) {
             message(e.message);
@@ -348,6 +352,16 @@ public class IrcCore : Object
             }
             disconnect();
         }
+    }
+
+    void schedule_register()
+    {
+        Timeout.add(READ_TIMEOUT, ()=> {
+            if (!got_line && !registered) {
+                register();
+            }
+            return false;
+        });
     }
 
     /**
@@ -360,12 +374,7 @@ public class IrcCore : Object
             var dis = new DataInputStream(stream);
             /* Now we loop. */
             string line = null;
-            Timeout.add(READ_TIMEOUT, ()=> {
-                if (!got_line && !registered) {
-                    register();
-                }
-                return false;
-            });
+
             while ((line = yield dis.read_line_async(Priority.DEFAULT, cancel)) != null) {
                 yield handle_line(line);
                 got_line = true;
@@ -436,6 +445,8 @@ public class IrcCore : Object
         cancel.reset();
         setup_io();
         tls_pending = false;
+
+        schedule_register();
         yield _irc_loop();
     }
 
@@ -476,6 +487,7 @@ public class IrcCore : Object
             t.accept_certificate.connect(accept_certificate);
         } else if (e == SocketClientEvent.TLS_HANDSHAKED) {
             message("Handshake complete");
+            schedule_register();
         }
     }
 
