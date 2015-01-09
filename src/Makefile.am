@@ -42,11 +42,13 @@ quirky_SOURCES = \
 	client-resources.h \
 	client-resources.c \
 	CountItem.vala \
+	Dialogs.vala \
 	IrcConstants.vala \
 	IrcCore.vala \
+	IrcTextEntry.vala \
 	IrcTextWidget.vala \
 	Messages.vala \
-	Widgets.vala \
+	Sidebar.vala \
 	QuirkyClient.vala
 
 quirky_CFLAGS = \
