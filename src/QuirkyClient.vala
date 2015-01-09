@@ -726,16 +726,46 @@ window.
         });
         application.add_action(action);
 
+        action = new SimpleAction("about", null);
+        action.activate.connect(()=> {
+            queue_draw();
+            Idle.add(()=> {
+                Gtk.show_about_dialog(this,
+                    "program-name", "Quirky IRC Client",
+                    "copyright", "Copyright \u00A9 2015 Ikey Doherty",
+                    "website", "https://evolve-os.com",
+                    "website-label", "Evolve OS",
+                    "license-type", Gtk.License.GPL_2_0,
+                    "comments", "IRC client for people who use IRC",
+                    "version", "0.1",
+                    "logo-icon-name", "xchat",
+                    "authors", new string[] {
+                        "Ikey Doherty <ikey@evolve-os.com>"
+                    }
+                );
+                input.grab_focus();
+                return false;
+            });
+        });
+        application.add_action(action);
+
         btn = new Gtk.MenuButton();
         img = new Gtk.Image.from_icon_name("emblem-system-symbolic", Gtk.IconSize.BUTTON);
         btn.add(img);
         menu = new Menu();
-        menu.append("Show timestamps", "app.timestamps");
-        menu.append("Show margin", "app.margin");
-        menu.append("Use dark theme", "app.dark_theme");
         btn.set_menu_model(menu);
         btn.set_use_popover(true);
         header.pack_end(btn);
+
+        var submenu = new Menu();
+        menu.append_submenu("Appearance", submenu);
+        menu.append("Show timestamps", "app.timestamps");
+        submenu.append("Show margin", "app.margin");
+        submenu.append("Use dark theme", "app.dark_theme");
+
+        submenu = new Menu();
+        menu.append_section(null, submenu);
+        submenu.append("About", "app.about");
 
         /* toggle timestamps */
         var paction = new PropertyAction("timestamps", main_view, "use_timestamp");
