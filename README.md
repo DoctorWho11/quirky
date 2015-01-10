@@ -16,6 +16,13 @@ License
 
 GPLv2
 
+Versioning
+---------
+
+Simple incremental version bumps, similar to other Evolve OS projects such as
+Budgie, i.e. v1, v2, v3. Version number is not an indicator of stability or
+feature parity.
+
 Authors
 -------
  * Ikey Doherty <ikey@evolve-os.com>
