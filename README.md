@@ -11,6 +11,13 @@ didn't have a shed-load of deps, and wasn't another IM library frontend. [1]
 
 Currently under heavy development!
 
+
+Important
+--------
+The core library is missing a ton of checks, so wil likely crash in some
+situations.  ircfuzz kills it instantly.  Also note there is NO SSL validation
+and all certificates are accepted!
+
 License
 ------
 
