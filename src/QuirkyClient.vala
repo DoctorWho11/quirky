@@ -114,15 +114,35 @@ window.
 
         try {
             settings.load_from_file(path, KeyFileFlags.NONE);
+            bool b;
 
-            var b = settings.get_boolean("UI", "EnableMargin");
-            main_view.visible_margin = b;
-            b = settings.get_boolean("UI", "EnableTimestamp");
-            main_view.use_timestamp = b;
-            b = settings.get_boolean("UI", "EnableDarkTheme");
-            get_settings().set_property("gtk-application-prefer-dark-theme", b);
+            if (settings.has_key("UI", "EnableMargin")) {
+                b = settings.get_boolean("UI", "EnableMargin");
+                main_view.visible_margin = b;
+            }
+            if (settings.has_key("UI", "EnableTimestamp")) {
+                b = settings.get_boolean("UI", "EnableTimestamp");
+                main_view.use_timestamp = b;
+            }
+            if (settings.has_key("UI", "EnableDarkTheme")) {
+                b = settings.get_boolean("UI", "EnableDarkTheme");
+                get_settings().set_property("gtk-application-prefer-dark-theme", b);
+            }
         } catch (Error e) {
             warning("Badly handled error: %s", e.message);
+        }
+    }
+
+    private void flush_settings()
+    {
+        var path = Path.build_path(Path.DIR_SEPARATOR_S, Environment.get_user_config_dir(), "quirky.conf");
+
+        try {
+            var data = settings.to_data();
+            FileUtils.set_contents(path, data);
+            FileUtils.chmod(path, 00600);
+        } catch (Error e) {
+            warning("Badly handled flush error: %s", e.message);
         }
     }
 
@@ -910,6 +930,35 @@ window.
         input.grab_default();
         this.set_default(input);
         input.grab_focus();
+
+        /* Due to using property actions */
+        main_view.notify["visible-margin"].connect(()=> {
+            try {
+                settings.set_boolean("UI", "EnableMargin", main_view.visible_margin);
+                flush_settings();
+            } catch (Error e) {
+                warning("Error setting boolean: %s", e.message);
+            }
+        });
+        main_view.notify["use-timestamp"].connect(()=> {
+            try {
+                settings.set_boolean("UI", "EnableTimestamp", main_view.use_timestamp);
+                flush_settings();
+            } catch (Error e) {
+                warning("Error setting boolean: %s", e.message);
+            }
+        });
+        get_settings().notify["gtk-application-prefer-dark-theme"].connect(()=> {
+            try {
+                bool dark;
+                get_settings().get("gtk-application-prefer-dark-theme", out dark);
+                settings.set_boolean("UI", "EnableDarkTheme", dark);
+                flush_settings();
+            } catch (Error e) {
+                warning("Error setting boolean: %s", e.message);
+            }
+        });
+
 
         insert_disclaimer();
         /*
