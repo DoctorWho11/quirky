@@ -19,6 +19,7 @@ public struct IrcParserContext {
 }
 
 public enum IrcParserFlags {
+    NONE            = 0,
     VALUE_ONLY      = 1 << 0,
     REQUIRES_PARAMS = 1 << 1,
     REQUIRES_VALUE  = 1 << 2
@@ -81,7 +82,7 @@ public class IrcParser {
 
         /* Special cases like ping. */
         if (cmd == null && !input.has_prefix(":")) {
-            cmd = input;
+            cmd = input.split(" ")[0];
             context.special = true;
         }
 

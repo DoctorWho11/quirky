@@ -607,37 +607,20 @@ public class IrcCore : Object
         if (line.has_suffix("\r")) {
             line = line.substring(0, line.length-1);
         }
-        string[] segments = line.split(" ");
-        if (segments.length < 2) {
-            warning("IRC server appears to be on crack. %s", line);
-            return;
-        }
 
-        if (!parser.parse(input, out context)) {
+        if (!parser.parse(line, out context)) {
             warning("Dropping invalid line: %s", input);
             return;
         }
 
         stdout.printf("%s\n", line);
+        stdout.printf("C: %s, N: %d, P: %s\n", context.command, context.numeric, context.prefix);
 
         /* bit hacky, but lets port numerics first */
         if (context.numeric > 0) {
             yield handle_numeric(context);
-            return;
-        }
-
-        /* Sender is a special case, can sometimes be a command.. */
-        string sender = segments[0];
-
-        /* Speed up processing elsewhere.. */
-        string? remnant = segments.length > 2  ? string.joinv(" ", segments[2:segments.length]) : null;
-
-        if (!sender.has_prefix(":")) {
-            /* Special command */
-            yield handle_command(sender, sender, line, remnant, true);
         } else {
-            string command = segments[1];
-            yield handle_command(sender, command, line, remnant);
+            yield handle_command(context);
         }
     }
 
@@ -917,21 +900,24 @@ public class IrcCore : Object
     /**
      * Handle a command from the server (string)
      *
-     * @param sender Originator of message
-     * @param command The command name
-     * @param line The unprocessed line
-     * @param remnant Remainder of processed line
-     * @param special Whether this is a special case, like PING or ERROR
+     * @param context Initialised IrcParserContext
      */
-    async void handle_command(string sender, string command, string line, string? remnant, bool special = false)
+    async void handle_command(IrcParserContext context)
     {
-        if (special) {
-            switch (command) {
+        if (context.special) {
+            switch (context.command) {
                 case "PING":
-                    var send = line.replace("PING", "PONG");
-                    write_socket("%s\r\n", send);
+                    if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE, -1, -1, -1)) {
+                        break;
+                    }
+                    write_socket("PONG :%s\r\n", context.text);
                     return;
                 case "AUTHENTICATE":
+                    if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS, 1, 1, -1)) {
+                        message("TELL ME LIES TELL ME SWEET LITTLE LIES");
+                        break;
+                    }
+                    message("LOGGING IN :D");
                     logging_in();
                     yield sasl_auth();
                     break;
@@ -941,17 +927,20 @@ public class IrcCore : Object
             }
         }
 
-        switch (command) {
+        IrcUser? user = user_from_hostmask(context.prefix);
+
+        switch (context.command) {
             /* caps handling */
             case "CAP":
-                string msg;
-                string[] params;
-                parse_simple(sender, remnant, null, out params, out msg);
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS |
+                    IrcParserFlags.REQUIRES_VALUE, 2, 2, -1)) {
+                    break;
+                }
 
                 /* currently we don't support dynamic (post-reg) changes */
-                if (params[1] == "LS") {
+                if (context.params[1] == "LS") {
                     /* CAP LS response */
-                    msg = msg.strip();
+                    var msg = context.text.strip();
                     capabilities = msg.split(" ");
                     /** Note, we don't actually request any CAPS yet. */
 
@@ -963,17 +952,17 @@ public class IrcCore : Object
                     if (cap_requests.length > 0) {
                         write_socket("CAP REQ :%s\r\n", string.joinv(" ", cap_requests));
                     }
-                } else if (params[1] == "ACK") {
+                } else if (context.params[1] == "ACK") {
                     /* Got a requested capability */
-                    foreach (var ack in msg.split(" ")) {
+                    foreach (var ack in context.text.split(" ")) {
                         if (ack.strip() == "") {
                             continue;
                         }
                         cap_granted += ack;
                     }
-                } else if (params[1] == "NAK") {
+                } else if (context.params[1] == "NAK") {
                     /* Denid a requested capability */
-                    foreach (var nack in msg.split(" ")) {
+                    foreach (var nack in context.text.split(" ")) {
                         if (nack.strip() == "") {
                             continue;
                         }
@@ -1005,85 +994,70 @@ public class IrcCore : Object
                 break;
             case "PRIVMSG":
             case "NOTICE":
-                IrcUser user;
-                string message;
-                string[] params;
-                parse_simple(sender, remnant, out user, out params, out message);
-                if (params.length != 1) {
-                    warning(@"Invalid $(command): more than one target!");
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS |
+                    IrcParserFlags.REQUIRES_VALUE, 1, 1, -1)) {
                     break;
                 }
                 string ctcp_command;
                 string ctcp_string;
+                string message = context.text;
                 IrcMessageType type;
-                if (params[0] == ident.nick) {
+
+                if (context.params[0] == ident.nick) {
                     type = IrcMessageType.PRIVATE;
                 } else {
                     type = IrcMessageType.CHANNEL;
                 }
-                if (parse_ctcp(message, out ctcp_command, out ctcp_string)) {
+                if (parse_ctcp(context.text, out ctcp_command, out ctcp_string)) {
                     if (ctcp_command == "ACTION") {
                         type |= IrcMessageType.ACTION;
                         message = ctcp_string;
                     } else {
                         /* Send off to ctcp handlers instead. */
-                        ctcp(user, ctcp_command, ctcp_string, command == "PRIVMSG");
+                        ctcp(user, ctcp_command, ctcp_string, context.command == "PRIVMSG");
                         break;
                     }
                 }
-                if (command == "PRIVMSG") {
-                    messaged(user, params[0], message, type);
+                if (context.command == "PRIVMSG") {
+                    messaged(user, context.params[0], message, type);
                 } else {
-                    noticed(user, params[0], message, type);
+                    noticed(user, context.params[0], message, type);
                 }
                 break;
             case "JOIN":
-                IrcUser user;
-                string channel;
-                parse_simple(sender, remnant, out user, null, out channel, true);
-                joined_channel(user, channel);
+                /* More fucking standards. Some send JOIN :#channel. Some send JOIN #channel. */
+                if (!parser.valid(context, IrcParserFlags.NONE, 0, 1, -1)) {
+                    break;
+                }
+                if (context.text == null && context.params == null) {
+                    /* ircfuzzed. */
+                    break;
+                }
+                joined_channel(user, context.text != null ? context.text : context.params[0]);
                 break;
             case "PART":
-                IrcUser user;
-                string rhs;
-                string[] params;
-                string channel;
-                string? reason = null;
-                /* Long story short:
-                 * PART #somechannel
-                 * PART #somechannel :Reason
-                 */
-                parse_simple(sender, remnant, out user, out params, out rhs);
-                if (params.length > 1) {
-                    warning("Invalid PART: more than one target!");
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS, 1, 2, -1)) {
                     break;
                 }
-                if (params.length == 1) {
-                    channel = params[0];
-                    reason = rhs;
-                } else {
-                    channel = rhs;
-                }
-                parted_channel(user, channel, reason);
+                parted_channel(user, context.params != null ? context.params[0] : context.text, context.text);
                 break;
             case "KICK":
-                IrcUser user;
-                string? reason = null;
-                string[] params;
-                parse_simple(sender, remnant, out user, out params, out reason);
-
-                if (params.length != 2) {
-                    warning("Invalid KICK: Wrong parameter count!");
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS |
+                    IrcParserFlags.REQUIRES_VALUE, 2, 2, -1)) {
                     break;
                 }
 
-                user_kicked(user, params[0], params[1], reason);
+                user_kicked(user, context.params[0], context.params[1], context.text);
                 break;
             case "NICK":
-                IrcUser user = user_from_hostmask(sender);
-                var new_nick = remnant.strip().replace(":", "");
-                /* Le sigh for standards. Some send :, some don't */
-                /* Update our own nick */
+                if (!parser.valid(context, IrcParserFlags.NONE, 0, 1, -1)) {
+                    break;
+                }
+                if (context.text == null && context.params == null) {
+                    /* ircfuzzed. */
+                    break;
+                }
+                var new_nick = context.text != null ? context.text : context.params[0];
                 if (user.nick == ident.nick) {
                     ident.nick = new_nick;
                     nick_changed(user, new_nick, true);
@@ -1092,10 +1066,10 @@ public class IrcCore : Object
                 }
                 break;
             case "QUIT":
-                IrcUser user;
-                string quit_msg;
-                parse_simple(sender, remnant, out user, null, out quit_msg);
-                user_quit(user, quit_msg);
+                if (!parser.valid(context, IrcParserFlags.VALUE_ONLY, -1, -1, -1)) {
+                    break;
+                }
+                user_quit(user, context.text);
                 break;
             default:
                 break;
