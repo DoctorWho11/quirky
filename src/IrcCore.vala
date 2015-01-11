@@ -172,6 +172,9 @@ public class IrcCore : Object
     private string[] cap_granted;
     private bool to_tls = false;
 
+    private HashTable<string,IrcHandler?> cmd_handlers;
+    private HashTable<int,IrcHandler?> num_handlers;
+
     /* Does the grunt work of ensuring input is valid */
     private IrcParser parser;
 
@@ -265,6 +268,9 @@ public class IrcCore : Object
         channel_cache = new HashTable<string,Channel>(str_hash, str_equal);
 
         parser = new IrcParser();
+        num_handlers = new HashTable<int,IrcHandler?>(direct_hash,direct_equal);
+        cmd_handlers = new HashTable<string,IrcHandler?>(str_hash, str_equal);
+        init_numerics();
 
         out_q = new Queue<string>();
         out_s = 0;
@@ -596,6 +602,9 @@ public class IrcCore : Object
      */
     async void handle_line(string input)
     {
+        IrcParserContext context;
+        weak IrcHandler? handler = null;
+
         var line = input;
         /* You'd surely hope so. */
         if (line.has_suffix("\r\n")) {
@@ -605,6 +614,51 @@ public class IrcCore : Object
         if (line.has_suffix("\r")) {
             line = line.substring(0, line.length-1);
         }
+
+        if (!parser.parse(input, out context)) {
+            warning("Dropping invalid line: %s", input);
+            return;
+        }
+        if (context.numeric > 0) {
+            handler = num_handlers[context.numeric];
+        } else {
+            handler = cmd_handlers[context.command];
+        }
+
+        /* New handler system  - used before the old system (which is being ported) */
+        if (handler != null) {
+            if ((handler.flags & IrcParseFlags.REQUIRES_VALUE) != 0) {
+                if (context.text == null) {
+                    warning("Dropping %s due to missing value", context.command);
+                    return;
+                }
+                if (handler.max_arg > 0 && context.text.split(" ").length != handler.max_arg) {
+                    warning("Dropping %s due to invalid parameter count", context.command);
+                    return;
+                }
+            }
+            if ((handler.flags & IrcParseFlags.REQUIRES_PARAMS) != 0) {
+                if (context.params == null) {
+                    warning("Dropping %s due to missing parameters", context.command);
+                    return;
+                }
+                if (handler.min_params == handler.max_params &&
+                    context.params.length != handler.min_params) {
+                    warning("Dropping %s due to invalid parameter count", context.command);
+                    return;
+                }
+            }
+            if ((handler.flags & IrcParseFlags.VALUE_ONLY) != 0) {
+                if (context.params != null) {
+                    warning("Dropping %s due to non-required parameters", context.command);
+                    return;
+                }
+            }
+            handler.ex(ref context);
+            return;
+        }
+
+        /* OLD CODE - BEING PORTED TO PARSER!! */
         string[] segments = line.split(" ");
         if (segments.length < 2) {
             warning("IRC server appears to be on crack. %s", line);
@@ -631,6 +685,19 @@ public class IrcCore : Object
         stdout.printf("%s\n", line);
     }
 
+    /* Set up all the callbacks */
+    void init_numerics()
+    {
+        num_handlers[IRC.RPL_WELCOME] = IrcHandler() {
+            flags = IrcParseFlags.REQUIRES_PARAMS,
+            min_params = 1,
+            max_params = 1,
+            ex = (ctx)=> {
+                ident.nick = ctx.params[0];
+                established();
+            }
+        };
+    }
     /**
      * Handle a numeric response from the server
      *
@@ -644,13 +711,6 @@ public class IrcCore : Object
         /* NOTE: Doesn't need to be async *yet* but will in future.. */
         /* TODO: Support all RFC numerics */
         switch (numeric) {
-            case IRC.RPL_WELCOME:
-                string[] params;
-                parse_simple(sender, remnant, null, out params, null);
-                /* If we changed nick during registration, we resync here. */
-                ident.nick = params[0];
-                established();
-                break;
             case IRC.TLS_BEGIN:
                 yield setup_tls();
                 break;
