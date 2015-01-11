@@ -140,7 +140,10 @@ window.
         try {
             var data = settings.to_data();
             FileUtils.set_contents(path, data);
+/* TODO: Fix this for Windows! */
+#if ! WINDOWSBUILD
             FileUtils.chmod(path, 00600);
+#endif
         } catch (Error e) {
             warning("Badly handled flush error: %s", e.message);
         }
