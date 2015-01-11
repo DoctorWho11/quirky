@@ -570,26 +570,6 @@ public class IrcCore : Object
     }
 
     /**
-     * Determine if we have a numeric string or not
-     *
-     * @param input String to check
-     *
-     * @returns a boolean, true if the input is numeric, otherwise false
-     */
-    bool is_number(string input)
-    {
-        bool numeric = false;
-        for (int i=0; i<input.length; i++) {
-            char c = (char)input.get_char(i);
-            numeric = c.isdigit();
-            if (!numeric) {
-                return numeric;
-            }
-        }
-        return numeric;
-    }
-
-    /**
      * Pre-process line from server and dispatch for numeric or command handlers
      *
      * @param input The input line from the server
