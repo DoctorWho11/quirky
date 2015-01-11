@@ -24,6 +24,7 @@ bin_PROGRAMS = \
 dummy_bot_SOURCES = \
 	IrcConstants.vala \
 	IrcCore.vala \
+	IrcParser.vala \
 	DummyBot.vala
 
 dummy_bot_CFLAGS = \
@@ -45,6 +46,7 @@ quirky_SOURCES = \
 	Dialogs.vala \
 	IrcConstants.vala \
 	IrcCore.vala \
+	IrcParser.vala \
 	IrcTextEntry.vala \
 	IrcTextWidget.vala \
 	Messages.vala \

@@ -172,6 +172,9 @@ public class IrcCore : Object
     private string[] cap_granted;
     private bool to_tls = false;
 
+    /* Does the grunt work of ensuring input is valid */
+    private IrcParser parser;
+
     const unichar CTCP_PREFIX = '\x01';
 
     /** Allows tracking of connected state.. */
@@ -260,6 +263,8 @@ public class IrcCore : Object
 
         channels = new HashTable<string,Channel>(str_hash, str_equal);
         channel_cache = new HashTable<string,Channel>(str_hash, str_equal);
+
+        parser = new IrcParser();
 
         out_q = new Queue<string>();
         out_s = 0;
