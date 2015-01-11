@@ -3,6 +3,7 @@ EXTRA_DIST = \
 	messages.conf \
 	servers.conf \
 	style.css \
+	quirky.desktop \
 	quirky-128x128.png \
 	quirky-16x16.png \
 	quirky-192x192.png \
@@ -16,6 +17,11 @@ EXTRA_DIST = \
 	quirky-64x64.png \
 	quirky-72x72.png \
 	quirky-96x96.png
+
+# Our .desktop file
+desktopdir=$(datadir)/applications
+desktop_DATA = \
+	quirky.desktop
 
 # Our PNG's
 icon_sizes = \

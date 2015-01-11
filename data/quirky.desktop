@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Quirky
+GenericName=IRC Client
+Comment=Modern and clean IRC client
+Icon=quirky
+Exec=quirky
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Network;InstantMessaging;
+StartupNotify=false
