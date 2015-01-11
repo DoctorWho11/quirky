@@ -625,8 +625,6 @@ public class IrcCore : Object
             handler = cmd_handlers[context.command];
         }
 
-        stdout.printf("%s\n", line);
-
         /* New handler system  - used before the old system (which is being ported) */
         if (handler != null) {
             if ((handler.flags & IrcParseFlags.REQUIRES_VALUE) != 0) {
@@ -684,6 +682,7 @@ public class IrcCore : Object
                 yield handle_command(sender, command, line, remnant);
             }
         }
+        stdout.printf("%s\n", line);
     }
 
     /* Set up all the callbacks */
