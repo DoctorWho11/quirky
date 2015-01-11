@@ -9,63 +9,17 @@
  * (at your option) any later version.
  */
 
-/**
- * Validation purposes.
- * i.e. a JOIN is VALUE_ONLY, anything after ": "
- * PRIVMSG is REQUIRES_VALUE|REQUIRES_PARAMS. Parameter is the target, and the
- * text segment is the PRIVMSG.. Well, you get the idea.
- */
-public enum IrcParseFlags {
-    NONE            = 0,
-    VALUE_ONLY      = 1 << 0,
-    REQUIRES_PARAMS = 1 << 1,
-    REQUIRES_VALUE  = 1 << 2
-}
-
-/**
- * Encapsulate the parsing context and provide everything that a handler could
- * possibly need to know.
- */
 public struct IrcParserContext {
-    string? prefix; /**<Sender prefix, i.e. server or hostmask */
-    string? command; /**<Command or numeric, i.e. PRIVMSG,  0001 */
-    string[]? params; /**<Parameters given in the command, i.e. #evolveos */
-    string? text; /**<Text segment following ": ", i.e. HAI THAR */
-    int numeric; /**<Numeric value of command segment, -1 if its not a numeric */
-    bool special; /**<Special case like PING, i.e. no :prefix, and cmd == prefix */
+    string? prefix;
+    string? command;
+    string[]? params;
+    string? text;
+    int numeric;
+    bool special;
 }
 
-/**
- * Callback definition for IrcHandlers
- */
-public delegate void IrcCallback (ref IrcParserContext p);
-
-/**
- * Required for safe encapsulation of a callback
- */
-public struct IrcHandler
-{
-    IrcParseFlags flags;    /* Required flags to be a valid call */
-    weak IrcCallback ex;     /* Callback to execute when everything is valid. */
-    int min_params;          /* Minimum parameter count for REQUIRES_PARAMS */
-    int max_params;          /* Maximum parameter count for REQUIRES_PARAMS */
-    int max_arg;             /* Maximum arguments in a text segment */
-}
-
-/**
- * Simplistic parser of IRC text. Keeps us Moar Safer.
- */
 public class IrcParser {
 
-    /**
-     * Parse the given raw line (post \r\n strip) and if successful, populate
-     * the context with everything known during this parse step
-     *
-     * @param input Raw line of IRC input
-     * @param context Set when this method is successful
-     *
-     * @return true if this was successful, or false if we fail.
-     */
     public bool parse(string input, out IrcParserContext context)
     {
         context = IrcParserContext() {
