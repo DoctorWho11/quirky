@@ -69,6 +69,8 @@ public class QuirkyClient : Gtk.ApplicationWindow
 
     bool is_channel = false;
 
+    KeyFile settings;
+
     /**
      * While in early alpha..
      */
@@ -100,6 +102,28 @@ window.
         // set_buffer looks for this or core.ident
         buffer.set_data("longestnick", "info");
         set_buffer(buffer);
+    }
+
+    private void init_settings()
+    {
+        settings = new KeyFile();
+        var path = Path.build_path(Path.DIR_SEPARATOR_S, Environment.get_user_config_dir(), "quirky.conf");
+        if (!FileUtils.test(path, FileTest.EXISTS)) {
+            return;
+        }
+
+        try {
+            settings.load_from_file(path, KeyFileFlags.NONE);
+
+            var b = settings.get_boolean("UI", "EnableMargin");
+            main_view.visible_margin = b;
+            b = settings.get_boolean("UI", "EnableTimestamp");
+            main_view.use_timestamp = b;
+            b = settings.get_boolean("UI", "EnableDarkTheme");
+            get_settings().set_property("gtk-application-prefer-dark-theme", b);
+        } catch (Error e) {
+            warning("Badly handled error: %s", e.message);
+        }
     }
 
     private void update_actions()
@@ -543,6 +567,9 @@ window.
         header.set_title("Quirky");
 
         main_view = new IrcTextWidget(_colors);
+        main_view.use_timestamp = true;
+
+        init_settings();
 
         commands = new HashTable<string,Command?>(str_hash, str_equal);
         /* Handle /me action */
@@ -808,7 +835,6 @@ window.
         scroll = new Gtk.ScrolledWindow(null, null);
         scroll.set_shadow_type(Gtk.ShadowType.IN);
         main_view.set_editable(false);
-        main_view.use_timestamp = true;
         scroll.add(main_view);
         layout.pack_start(scroll, true, true, 0);
 
