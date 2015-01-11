@@ -107,7 +107,7 @@ public class IrcTextEntry : Gtk.Entry
         }
 
         /* Handle mirc colours first */
-        if (event.state == Gdk.ModifierType.CONTROL_MASK) {
+        if ((event.state & Gdk.ModifierType.CONTROL_MASK) != 0) {
             switch (event.keyval) {
                 case Gdk.Key.K:
                 case Gdk.Key.k:
