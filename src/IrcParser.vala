@@ -18,6 +18,12 @@ public struct IrcParserContext {
     bool special;
 }
 
+public enum IrcParserFlags {
+    VALUE_ONLY      = 1 << 0,
+    REQUIRES_PARAMS = 1 << 1,
+    REQUIRES_VALUE  = 1 << 2
+}
+
 public class IrcParser {
 
     public bool parse(string input, out IrcParserContext context)
@@ -91,6 +97,41 @@ public class IrcParser {
             context.params = params.strip().split(" ");
         }
 
+        return true;
+    }
+
+    public bool valid(IrcParserContext context, IrcParserFlags flags, int min_params, int max_params, int max_args)
+    {
+        if ((flags & IrcParserFlags.REQUIRES_PARAMS) != 0) {
+            if (context.params == null) {
+                warning("Dropping %s, no params", context.command);
+                return false;
+            }
+            if (min_params == max_params && context.params.length != min_params) {
+                warning("Dropping %s, invalid param count", context.command);
+                return false;
+            }
+            if ((context.params.length < min_params && min_params >= 0) || (context.params.length > max_params && max_params > 0)) {
+                warning("Dropping %s, invalid param count", context.command);
+                return false;
+            }
+        }
+        if ((flags & IrcParserFlags.REQUIRES_VALUE) != 0) {
+            if (context.text == null) {
+                warning("Dropping %s, no value", context.command);
+                return false;
+            }
+        }
+        if ((flags & IrcParserFlags.VALUE_ONLY) != 0) {
+            if (context.text == null) {
+                warning("Dropping %s, has params for value only", context.command);
+                return false;
+            }
+        }
+        if (max_args > 0 && context.text != null && context.text.split(" ").length > max_args) {
+            warning("Dropping %s, too many args", context.command);
+            return false;
+        }
         return true;
     }
 }

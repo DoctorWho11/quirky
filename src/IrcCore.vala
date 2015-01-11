@@ -596,6 +596,8 @@ public class IrcCore : Object
      */
     async void handle_line(string input)
     {
+        IrcParserContext context;
+
         var line = input;
         /* You'd surely hope so. */
         if (line.has_suffix("\r\n")) {
@@ -610,6 +612,20 @@ public class IrcCore : Object
             warning("IRC server appears to be on crack. %s", line);
             return;
         }
+
+        if (!parser.parse(input, out context)) {
+            warning("Dropping invalid line: %s", input);
+            return;
+        }
+
+        stdout.printf("%s\n", line);
+
+        /* bit hacky, but lets port numerics first */
+        if (context.numeric > 0) {
+            yield handle_numeric(context);
+            return;
+        }
+
         /* Sender is a special case, can sometimes be a command.. */
         string sender = segments[0];
 
@@ -621,14 +637,8 @@ public class IrcCore : Object
             yield handle_command(sender, sender, line, remnant, true);
         } else {
             string command = segments[1];
-            if (is_number(command)) {
-                var number = int.parse(command);
-                yield handle_numeric(sender, number, line, remnant);
-            } else {
-                yield handle_command(sender, command, line, remnant);
-            }
+            yield handle_command(sender, command, line, remnant);
         }
-        stdout.printf("%s\n", line);
     }
 
     /**
@@ -639,16 +649,18 @@ public class IrcCore : Object
      * @param line The unprocessed line
      * @param remnant Remainder of processed line
      */
-    async void handle_numeric(string sender, int numeric, string line, string? remnant)
+    async void handle_numeric(IrcParserContext context)
     {
+
         /* NOTE: Doesn't need to be async *yet* but will in future.. */
         /* TODO: Support all RFC numerics */
-        switch (numeric) {
+        switch (context.numeric) {
             case IRC.RPL_WELCOME:
-                string[] params;
-                parse_simple(sender, remnant, null, out params, null);
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS, 1, 1, -1)) {
+                        break;
+                }
                 /* If we changed nick during registration, we resync here. */
-                ident.nick = params[0];
+                ident.nick = context.params[0];
                 established();
                 break;
             case IRC.TLS_BEGIN:
@@ -660,16 +672,17 @@ public class IrcCore : Object
 
             /* SASL magicks. */
             case IRC.RPL_LOGGEDIN:
-                string msg;
-                string[] params;
-                parse_simple(sender, remnant, null, out params, out msg);
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS |
+                    IrcParserFlags.REQUIRES_VALUE, 3, 3, -1)) {
+                    break;
+                }
                 message("SASL auth success");
                 write_socket("CAP END\r\n");
                 if (to_tls) {
                     write_socket("STARTTLS\r\n");
                     to_tls = false;
                 }
-                login_success(params[2], msg);
+                login_success(context.params[2], context.text);
                 break;
             case IRC.ERR_NICKLOCKED:
             case IRC.ERR_SASLFAIL:
@@ -677,44 +690,46 @@ public class IrcCore : Object
             case IRC.ERR_SASLABORTED:
             case IRC.ERR_SASLALREADY:
                 /* SASL failed, basically. */
-                string msg;
-                parse_simple(sender, remnant, null, null, out msg);
-                warning("SASL authentication failed with numeric: %d", numeric);
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE, -1, -1, -1)) {
+                    break;
+                }
+                warning("SASL authentication failed with numeric: %d", context.numeric);
                 write_socket("CAP END\r\n");
                 if (to_tls) {
                     write_socket("STARTTLS\r\n");
                     to_tls = false;
                 }
-                login_failed(msg);
+                login_failed(context.text);
                 break;
             /* Server info parsing, goodie! */
             case IRC.RPL_ISUPPORT:
-                string[] params;
-                parse_simple(sender, remnant, null, out params, null, true);
-                if (params.length == 1) {
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS, 1, -1, -1)) {
+                    break;
+                }
+                if (context.params.length == 1) {
                     /* Not yet handled. */
                     debug("Got RPL_BOUNCE, not RPL_ISUPPORT");
                     break;
                 }
                 string[] seps = { "=", ":" };
-                for (int i = 1; i < params.length; i++) {
+                for (int i = 1; i < context.params.length; i++) {
                     string key = null;
                     string val = null;
                     foreach (var sep in seps) {
-                        if (sep in params[i]) {
-                            var splits = params[i].split(sep);
+                        if (sep in context.params[i]) {
+                            var splits = context.params[i].split(sep);
                             key = splits[0];
                             if (splits.length > 1) {
                                 val = string.joinv(sep, splits[1:splits.length]);
                             } else {
                                 /* made a booboo */
-                                key = params[i];
+                                key = context.params[i];
                             }
                             break;
                         }
                     }
                     if (key == null) {
-                        key = params[i];
+                        key = context.params[i];
                     }
                     /* all require vals */
                     if (val == null) {
@@ -749,11 +764,12 @@ public class IrcCore : Object
                 break;
             case IRC.RPL_MONONLINE:
             case IRC.RPL_MONOFFLINE:
-                string msg;
-                parse_simple(sender, remnant, null, null, out msg);
-                foreach (var u in msg.strip().split(",")) {
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE, -1, -1, -1)) {
+                    break;
+                }
+                foreach (var u in context.text.strip().split(",")) {
                     var user = user_from_hostmask(u);
-                    if (numeric == IRC.RPL_MONONLINE) {
+                    if (context.numeric == IRC.RPL_MONONLINE) {
                         user_online(user);
                     } else {
                         user_offline(user);
@@ -762,106 +778,112 @@ public class IrcCore : Object
                 break;
             /* Names handling.. */
             case IRC.RPL_NAMREPLY:
-                string[] params; /* nick, mode, channel */
-                string msg;
                 unowned Channel? cc;
 
-                parse_simple(sender, remnant, null, out params, out msg, true);
-                if (params.length != 3) {
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE | IrcParserFlags.REQUIRES_PARAMS, 3, 3, -1)) {
                     warning("Invalid NAMREPLY parameter length!");
                     break;
                 }
 
-                if (!channel_cache.contains(params[2])) {
-                    channel_cache[params[2]] = new Channel(params[2], params[1]);
+                if (!channel_cache.contains(context.params[2])) {
+                    channel_cache[context.params[2]] = new Channel(context.params[2], context.params[1]);
                 }
-                cc = channel_cache[params[2]];
+                cc = channel_cache[context.params[2]];
                 /* New names reply, reset cached version.. */
                 if (cc.final) {
                     cc.reset_users();
                 }
-                foreach (var user in msg.strip().split(" ")) {
+                foreach (var user in context.text.strip().split(" ")) {
                    cc.add_user(user);
                 }
                 break;
             case IRC.RPL_ENDOFNAMES:
-                string[] params;
-                string msg; /* End of /NAMES, not really interesting. */
                 unowned Channel? cc;
-                parse_simple(sender, remnant, null, out params, out msg, true);
-                if (!channel_cache.contains(params[1])) {
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS | IrcParserFlags.REQUIRES_PARAMS, 2, 2, -1)) {
+                    break;
+                }
+                if (!channel_cache.contains(context.params[1])) {
                     warning("Got RPL_ENDOFNAMES without cached list!");
                     break;
                 }
-                cc = channel_cache[params[1]];
-                names_list(params[1], cc.get_users());
-                channel_cache.remove(params[1]);
+                cc = channel_cache[context.params[1]];
+                names_list(context.params[1], cc.get_users());
+                channel_cache.remove(context.params[1]);
                 break;
 
             /* Motd handling */
             case IRC.RPL_MOTDSTART:
                 _motd = ""; /* Reset motd */
-                string msg;
-                parse_simple(sender, remnant, null, null, out msg);
-                motd_start(msg);
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE |
+                    IrcParserFlags.REQUIRES_PARAMS, 1, 1, -1)) {
+                    break;
+                }
+                motd_start(context.text);
                 break;
             case IRC.RPL_MOTD:
-                string msg;
-                parse_simple(sender, remnant, null, null, out msg);
-                motd_line(msg);
-                _motd += "\n" + msg;
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE |
+                    IrcParserFlags.REQUIRES_PARAMS, 1, 1, -1)) {
+                    break;
+                }
+
+                motd_line(context.text);
+                _motd += "\n" + context.text;
                 break;
             case IRC.RPL_ENDOFMOTD:
-                string msg;
-                parse_simple(sender, remnant, null, null, out msg);
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE |
+                    IrcParserFlags.REQUIRES_PARAMS, 1, 1, -1)) {
+                    break;
+                }
                 if (!_motd.has_suffix("\n")) {
                     _motd += "\n";
                 }
-                motd(_motd, msg);
+                motd(_motd, context.text);
                 break;
 
             /* Nick error handling */
             case IRC.ERR_NICKNAMEINUSE:
-                string msg;
-                string[] params;
-                parse_simple(sender, remnant, null, out params, out msg);
-                nick_error(params.length > 1 ? params[1] : ident.nick , IrcNickError.IN_USE, msg);
-                break;
-            case IRC.ERR_NONICKNAMEGIVEN:
-                string msg;
-                string[] params;
-                parse_simple(sender, remnant, null, out params, out msg);
-                nick_error(params.length > 1 ? params[1] : ident.nick, IrcNickError.NO_NICK, msg);
-                break;
-            case IRC.ERR_ERRONEUSNICKNAME:
-                string msg;
-                string[] params;
-                parse_simple(sender, remnant, null, out params, out msg);
-                nick_error(params.length > 1 ? params[1] : ident.nick, IrcNickError.INVALID, msg);
-                break;
-            case IRC.ERR_NICKCOLLISION:
-                string msg;
-                string[] params;
-                parse_simple(sender, remnant, null, out params, out msg);
-                nick_error(params.length > 1 ? params[1] : ident.nick, IrcNickError.COLLISION, msg);
-                break;
-            case IRC.RPL_TOPIC:
-                string msg;
-                string[] params;
-                parse_simple(sender, remnant, null, out params, out msg);
-                topic(params[1], msg);
-                break;
-            case IRC.RPL_TOPICWHOTIME:
-                string[] params;
-                IrcUser who;
-                /* Cheating, shows the need here for validation later.. */
-                parse_simple(sender, remnant + " :", null, out params, null);
-                if (params.length < 4) {
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE |
+                    IrcParserFlags.REQUIRES_PARAMS, 2, 2, -1)) {
                     break;
                 }
-                who = user_from_hostmask(params[2]);
-                int64 stamp = int64.parse(params[3]);
-                topic_who(params[1], who, stamp);
+                nick_error(context.params[1] , IrcNickError.IN_USE, context.text);
+                break;
+            case IRC.ERR_NONICKNAMEGIVEN:
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE |
+                    IrcParserFlags.REQUIRES_PARAMS, 2, 2, -1)) {
+                    break;
+                }
+                nick_error(context.params[1], IrcNickError.NO_NICK, context.text);
+                break;
+            case IRC.ERR_ERRONEUSNICKNAME:
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE |
+                    IrcParserFlags.REQUIRES_PARAMS, 2, 2, -1)) {
+                    break;
+                }
+                nick_error(context.params[1], IrcNickError.INVALID, context.text);
+                break;
+            case IRC.ERR_NICKCOLLISION:
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE |
+                    IrcParserFlags.REQUIRES_PARAMS, 2, 2, -1)) {
+                    break;
+                }
+                nick_error(context.params[1], IrcNickError.COLLISION, context.text);
+                break;
+            case IRC.RPL_TOPIC:
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_VALUE |
+                    IrcParserFlags.REQUIRES_PARAMS, 2, 2, -1)) {
+                    break;
+                }
+                topic(context.params[1], context.text);
+                break;
+            case IRC.RPL_TOPICWHOTIME:
+                if (!parser.valid(context, IrcParserFlags.REQUIRES_PARAMS, 4, 4, -1)) {
+                    break;
+                }
+                IrcUser who;
+                who = user_from_hostmask(context.params[2]);
+                int64 stamp = int64.parse(context.params[3]);
+                topic_who(context.params[1], who, stamp);
                 break;
             default:
                 break;
