@@ -737,8 +737,11 @@ window.
                     "website-label", "Evolve OS",
                     "license-type", Gtk.License.GPL_2_0,
                     "comments", "IRC client for people who use IRC",
-                    "version", "0.1",
-                    "logo-icon-name", "xchat",
+                    "version", "1",
+                    "logo-icon-name", "quirky",
+                    "artists", new string[] {
+                        "Alejandro Seoane <asetrigo@gmail.com>"
+                    },
                     "authors", new string[] {
                         "Ikey Doherty <ikey@evolve-os.com>"
                     }
@@ -778,7 +781,7 @@ window.
 
         update_actions();
 
-        set_icon_name("xchat");
+        set_icon_name("quirky");
 
         var main_layout = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
         add(main_layout);
@@ -1163,7 +1166,7 @@ window.
     {
         switch (command) {
             case "VERSION":
-                core.send_ctcp(user.nick, "VERSION", "Quirky IRC Client 0.1 / Probably Linux!", privmsg);
+                core.send_ctcp(user.nick, "VERSION", "Quirky IRC Client 1 / Probably Linux!", privmsg);
                 break;
             case "PING":
                 if (text == "") {

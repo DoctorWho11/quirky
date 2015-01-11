@@ -34,4 +34,8 @@ Authors
 -------
  * Ikey Doherty <ikey@evolve-os.com>
 
+Icons
+------
+ * Quirky icon copyright of Alejandro Seoane, many thanks!
+ 
 [1] They are CHANNELS. Not ROOMS.
