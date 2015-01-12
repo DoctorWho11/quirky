@@ -56,6 +56,7 @@ public class JoinChannelDialog : Gtk.Dialog
 public class ConnectDialog : Gtk.Dialog
 {
 
+    public string network { public get; private set; }
     public string host { public get; private set; }
     public uint16 port { public get; private set; }
     public bool ssl { public get; private set; }
@@ -63,9 +64,14 @@ public class ConnectDialog : Gtk.Dialog
     public string nickname { public get; private set; }
     public string password { public get; private set; }
     public string auth_type { public get; private set; }
+    public string username { public get; private set; }
+    public string gecos { public get; private set; }
 
+    private Gtk.Entry network_ent;
     private Gtk.Entry nick_ent;
     private Gtk.Entry host_ent;
+    private Gtk.Entry username_ent;
+    private Gtk.Entry gecos_ent;
     private Gtk.Entry pass_entry;
     private Gtk.Entry channel_entry;
     private Gtk.Widget con;
@@ -73,12 +79,12 @@ public class ConnectDialog : Gtk.Dialog
     private Gtk.Label auth_label;
     private Gtk.Entry auth_entry;
 
-    public ConnectDialog(Gtk.Window parent)
+    public ConnectDialog(Gtk.Window parent, IrcNetwork? network)
     {
-        Object(transient_for: parent);
+        Object(transient_for: parent, use_header_bar: 1);
 
         add_button("Cancel", Gtk.ResponseType.CANCEL);
-        var w = add_button("Connect", Gtk.ResponseType.OK);
+        var w = add_button(network == null ? "Add" : "Save", Gtk.ResponseType.OK);
         w.get_style_context().add_class("suggested-action");
         w.set_sensitive(false);
         con = w;
@@ -90,12 +96,31 @@ public class ConnectDialog : Gtk.Dialog
         int column = 0;
         int norm_size = 1;
         int max_size = 3;
+        grid.column_spacing = 12;
+        grid.row_spacing = 12;
 
-        /* hostname */
-        var label = new Gtk.Label("Hostname");
+        /* network */
+        var label = new Gtk.Label("Network");
         label.halign = Gtk.Align.START;
         grid.attach(label, column, row, norm_size, norm_size);
         var entry = new Gtk.Entry();
+        network_ent = entry;
+        entry.changed.connect(()=> {
+            do_validate(false);
+        });
+        entry.activate.connect(()=> {
+            do_validate(true);
+        });
+        entry.hexpand = true;
+        grid.attach(entry, column+1, row, max_size-1, norm_size);
+        row++;
+
+        /* hostname */
+        label = new Gtk.Label("Hostname");
+        label.halign = Gtk.Align.START;
+        grid.attach(label, column, row, norm_size, norm_size);
+
+        entry = new Gtk.Entry();
         host_ent = entry;
         entry.changed.connect(()=> {
             do_validate(false);
@@ -105,8 +130,7 @@ public class ConnectDialog : Gtk.Dialog
         });
         entry.hexpand = true;
         grid.attach(entry, column+1, row, max_size-1, norm_size);
-        grid.column_spacing = 12;
-        grid.row_spacing = 12;
+
 
         row++;
         /* port */
@@ -136,6 +160,26 @@ public class ConnectDialog : Gtk.Dialog
         entry.hexpand = true;
         grid.attach(entry, column+1, row, max_size-1, norm_size);
 
+        row++;
+        label = new Gtk.Label("Username");
+        label.halign = Gtk.Align.START;
+        grid.attach(label, column, row, norm_size, norm_size);
+        entry = new Gtk.Entry();
+        username_ent = entry;
+        entry.text = Environment.get_user_name();
+        entry.hexpand = true;
+        grid.attach(entry, column+1, row, max_size-1, norm_size);
+
+        row++;
+        label = new Gtk.Label("Real name");
+        label.halign = Gtk.Align.START;
+        grid.attach(label, column, row, norm_size, norm_size);
+        entry = new Gtk.Entry();
+        gecos_ent = entry;
+        entry.text = Environment.get_user_name();
+        entry.hexpand = true;
+        grid.attach(entry, column+1, row, max_size-1, norm_size);
+
         /* Nick validation.. */
         entry.changed.connect(()=> {
             do_validate(false);
@@ -146,12 +190,13 @@ public class ConnectDialog : Gtk.Dialog
 
         row++;
         /* channel */
-        label = new Gtk.Label("Channel");
+        label = new Gtk.Label("Channels");
         label.halign = Gtk.Align.START;
         grid.attach(label, column, row, norm_size, norm_size);
         entry = new Gtk.Entry();
         entry.hexpand = true;
         channel_entry = entry;
+        channel = "";
         channel_entry.changed.connect(()=> {
             channel = channel_entry.text;
         });
@@ -166,8 +211,8 @@ public class ConnectDialog : Gtk.Dialog
         grid.attach(label, column, row, norm_size, norm_size);
         var combo = new Gtk.ComboBoxText();
         combo.append("none", "None");
-        combo.append("nickserv", "NickServ");
         combo.append("sasl", "SASL (PLAIN)");
+        combo.append("nickserv", "NickServ");
         grid.attach(combo, column+1, row, max_size-1, norm_size);
         combo.active_id = "none";
 
@@ -199,6 +244,35 @@ public class ConnectDialog : Gtk.Dialog
             password = pass_entry.get_text();
         });
 
+        if (network != null) {
+            network_ent.set_text(network.name);
+            host_ent.set_text(network.servers[0].hostname);
+            scale.set_value(network.servers[0].port);
+            check.set_active(network.servers[0].ssl);
+            nick_ent.set_text(network.nick1);
+            username_ent.set_text(network.username);
+            if (network.password != null) {
+                pass_entry.set_text(network.password);
+            }
+            gecos_ent.set_text(network.gecos);
+            switch (network.auth) {
+                case AuthenticationMode.NICKSERV:
+                    combo.active_id = "nickserv";
+                    break;
+                case AuthenticationMode.SASL:
+                    combo.active_id = "sasl";
+                    break;
+                default:
+                    combo.active_id = "none";
+                    break;
+            }
+            if (network.channels != null) {
+                channel_entry.set_text(string.joinv(" ", network.channels));
+            } else {
+                channel = "";
+            }
+            do_validate(false);
+        }
         grid.margin_bottom = 6;
 
     }
@@ -249,6 +323,10 @@ public class ConnectDialog : Gtk.Dialog
             nick_ent.set_icon_tooltip_text(Gtk.EntryIconPosition.PRIMARY, null);
         }
 
+        if (network_ent.text.strip() == "") {
+            con.set_sensitive(false);
+            return;
+        }
         if (host_ent.text.strip() == "") {
             con.set_sensitive(false);
             return;
@@ -259,7 +337,10 @@ public class ConnectDialog : Gtk.Dialog
         }
 
         host = host_ent.text;
+        gecos = gecos_ent.text;
+        username = username_ent.text;
         nickname = nick_ent.text;
+        network = network_ent.text;
         con.set_sensitive(true);
 
         if (emit) {

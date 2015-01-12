@@ -71,6 +71,8 @@ public class QuirkyClient : Gtk.ApplicationWindow
 
     KeyFile settings;
 
+    Gtk.Stack stack;
+    NetworkListView connect_view;
     /**
      * While in early alpha..
      */
@@ -154,9 +156,17 @@ window.
         (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected);
     }
 
-    private void connect_server(string host, uint16 port, bool ssl, string? autojoin, IrcIdentity ident)
+    private void connect_server(IrcNetwork? network)
     {
-        var header = sidebar.add_expandable(host, "network-server-symbolic");
+        var server = network.servers[0];
+        var ident = IrcIdentity() {
+            username = network.username,
+            nick = network.nick1,
+            gecos = network.gecos,
+            auth = AuthenticationMode.NONE
+        };
+
+        var header = sidebar.add_expandable(server.hostname, "network-server-symbolic");
         header.activated.connect(()=> {
             IrcCore core = header.get_data("icore");
             this.target = null;
@@ -178,12 +188,12 @@ window.
         side_reveal.set_transition_type(Gtk.RevealerTransitionType.SLIDE_RIGHT);
 
         /* Need moar status in window.. */
-        message("Connecting to %s:%d", host, port);
+        message("Connecting to %s:%d", server.hostname, server.port);
 
         var core = new IrcCore(ident);
+        core.set_data("network", network);
         roots[core] = header;
         header.set_data("icore", core);
-        core.set_data("autojoin", autojoin);
 
         /* init/setup */
         {
@@ -222,12 +232,13 @@ window.
             }
         });
 
-        core.connect.begin(host, port, ssl, false); /* Currently not a UI option */
+        core.connect.begin(server.hostname, server.port, server.ssl, false); /* Currently not a UI option */
         core.messaged.connect(on_messaged);
         core.established.connect(()=> {
-            string aj = core.get_data("autojoin");
-            if (aj != null) {
-                core.join_channel(aj);
+            IrcNetwork? n = core.get_data("network");
+            /* TODO: Use a single call. */
+            foreach (var channel in n.channels) {
+                core.join_channel(channel);
             }
             update_actions();
             update_nick(core);
@@ -747,6 +758,7 @@ window.
         var menu = new Menu();
         menu.append("Connect to server", "app.connect");
         menu.append("Join channel", "app.join_channel");
+        menu.append("Add a server", "app.add_server");
         btn.set_menu_model(menu);
         btn.set_use_popover(true);
 
@@ -767,6 +779,16 @@ window.
         application.add_action(action);
         /* connect to server. */
         action = new SimpleAction("connect", null);
+        action.activate.connect(()=> {
+            queue_draw();
+            Idle.add(()=> {
+                show_connect_dialog();
+                return false;
+            });
+        });
+        application.add_action(action);
+        /* add server, only available on connect page.. */
+        action = new SimpleAction("add_server", null);
         action.activate.connect(()=> {
             queue_draw();
             Idle.add(()=> {
@@ -833,8 +855,20 @@ window.
 
         set_icon_name("quirky");
 
+        stack = new Gtk.Stack();
+        stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT);
+        add(stack);
+
+        var connect = new NetworkListView();
+        this.connect_view = connect;
+        connect.activated.connect(on_network_select);
+        connect.edit.connect(on_network_edit);
+        connect.closed.connect(()=> {
+            this.stack.set_visible_child_name("main");
+        });
+        stack.add_named(connect, "connect");
         var main_layout = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
-        add(main_layout);
+        stack.add_named(main_layout, "main");
 
         /* Sidebar.. */
         scroll = new Gtk.ScrolledWindow(null, null);
@@ -969,6 +1003,17 @@ window.
             show_connect_dialog();
             return false;
         });*/
+    }
+
+    void on_network_select(IrcNetwork? network)
+    {
+        stack.set_visible_child_name("main");
+        connect_server(network);
+    }
+
+    void on_network_edit(IrcNetwork? network)
+    {
+        show_connect_dialog(network);
     }
 
     /**
@@ -1204,12 +1249,13 @@ window.
     }
 
     /**
-     * Show a network connect dialog. In future we'll have identities and stored
-     * networks
+     * Show a network connect dialog.
+     *
+     * TODO: Remove massive amounts of redundant storage......
      */
-    private void show_connect_dialog()
+    private void show_connect_dialog(IrcNetwork? old = null)
     {
-        var dlg = new ConnectDialog(this);
+        var dlg = new ConnectDialog(this, old);
         if (dlg.run() == Gtk.ResponseType.OK) {
             IrcIdentity ident = IrcIdentity() {
                 nick = "quirky", /* Backup */
@@ -1231,7 +1277,31 @@ window.
                     break;
             }
             ident.nick = dlg.nickname;
-            connect_server(dlg.host, dlg.port, dlg.ssl, dlg.channel, ident);
+            ident.username = dlg.username;
+            ident.gecos = dlg.gecos;
+
+            IrcNetwork n = IrcNetwork() {
+                 name = dlg.network,
+                 username = ident.username,
+                 gecos = ident.gecos,
+                 password = ident.password,
+                 auth = ident.auth,
+                 channels = dlg.channel.split(" "),
+                 nick1 = ident.nick,
+                 nick2 = ident.nick + "_",
+                 nick3 = ident.nick + "__",
+                 servers = new IrcServer[] {
+                    IrcServer() {
+                         hostname = dlg.host,
+                         port = dlg.port,
+                         ssl = dlg.ssl
+                     }
+                 }
+             };
+             if (old != null) {
+                 connect_view.remove_network(old);
+             }
+             connect_view.add_network(n);
         }
         dlg.destroy();
         input.grab_focus();
@@ -1522,6 +1592,213 @@ window.
             remnant = null;
         }
         command.cb(remnant);
+    }
+}
+
+public struct IrcServer {
+    string hostname;
+    uint16 port;
+    bool ssl;
+}
+
+public struct IrcNetwork {
+    string name;
+    string username;
+    string gecos;
+    string nick1;
+    string nick2;
+    string nick3;
+    IrcServer[] servers;
+    string[] channels;
+    string password;
+    AuthenticationMode auth;
+}
+public class NetworkListView : Gtk.Box
+{
+
+    public signal void activated(IrcNetwork? network);
+    public signal void edit(IrcNetwork? network);
+    public signal void closed();
+
+    HashTable<string,IrcNetwork?> networks;
+    IrcNetwork? network;
+    Gtk.Button connectbtn;
+    Gtk.Button editbtn;
+    Gtk.ComboBoxText combo;
+
+    public void add_network(IrcNetwork network)
+    {
+        if (!(network.name in networks)) {
+            combo.append(network.name, network.name);
+        }
+
+        networks[network.name] = network;
+        if (this.network.name == network.name) {
+            this.network = network;
+        }
+    }
+
+    public void remove_network(IrcNetwork network)
+    {
+        if (network.name in networks) {
+            combo.remove_all();
+            networks.remove(network.name);
+            networks.foreach((k,v)=>{
+                combo.append(network.name, network.name);
+            });
+        }
+    }
+
+    void on_changed(Gtk.ComboBox? txt)
+    {
+        string active = (txt as Gtk.ComboBoxText).get_active_text();
+        if (active in networks) {
+            this.network = networks[active];
+            connectbtn.set_sensitive(true);
+            editbtn.set_sensitive(true);
+            return;
+        }
+        editbtn.set_sensitive(false);
+        if (" " in active) {
+            connectbtn.set_sensitive(false);
+            return;
+        }
+
+        active = active.strip();
+        if (active.length == 0) {
+            connectbtn.set_sensitive(false);
+            return;
+        }
+
+        uint16 port = 6667;
+        bool ssl = false;
+        string host = active;
+        if (":" in active) {
+            var splits = active.split(":");
+            host = splits[0];
+            var port_sect = splits[1];
+            if (port_sect.has_prefix("+")) {
+                ssl = true;
+                port_sect = port_sect.substring(1);
+                if (port_sect.length == 0) {
+                    connectbtn.set_sensitive(false);
+                    return;
+                }
+            }
+            port = (uint16)int.parse(port_sect);
+            if (port < 0) {
+                port = 6667;
+            }
+        }
+        this.network = IrcNetwork() {
+            name = host,
+            username = "quirky",
+            gecos = "Quirky User",
+            nick1 = "quirkyuser",
+            nick2 = "quirkyuser_",
+            nick3 = "quirkyuser__",
+            servers = new IrcServer[] {
+                IrcServer() {
+                    hostname = host,
+                    ssl = ssl,
+                    port = port
+                }
+            }
+        };
+        connectbtn.set_sensitive(true);
+    }
+
+    public NetworkListView()
+    {
+        Object(orientation: Gtk.Orientation.VERTICAL);
+        get_style_context().add_class("view");
+        get_style_context().add_class("content-view");
+
+        networks = new HashTable<string,IrcNetwork?>(str_hash, str_equal);
+
+        networks["freenode"] = IrcNetwork() {
+            name = "freenode",
+            username = Environment.get_user_name(),
+            gecos = "quirkyclient",
+            nick1 = "quirkyclient",
+            nick2 = "quirkyclient_",
+            nick3 = "quirkyclient__",
+            servers = new IrcServer[] {
+                IrcServer() { hostname = "irc.freenode.net", port = 6667, ssl = false }
+            },
+            channels = new string[] { "#evolveos" }
+        };
+
+        var grid = new Gtk.Grid();
+        grid.halign = Gtk.Align.CENTER;
+        grid.valign = Gtk.Align.CENTER;
+        pack_start(grid, true, true, 0);
+        
+        grid.set_column_spacing(10);
+        grid.set_row_spacing(10);
+
+        grid.margin_left = 50;
+        grid.margin_right = 50;
+
+        var row = 0;
+        var label = new Gtk.Label("<span size='xx-large'>Connect to IRC</span>");
+        label.margin_bottom = 20;
+        label.use_markup = true;
+        grid.attach(label, 0, row, 3, 1);
+
+        ++row;
+        label = new Gtk.Label("Network");
+        label.halign = Gtk.Align.END;
+        grid.attach(label, 0, row, 1, 1);
+
+        combo = new Gtk.ComboBoxText.with_entry();
+        combo.append("default", "freenode");
+        combo.active_id = "default";
+
+        var ent = combo.get_child() as Gtk.Entry;
+        ent.set_icon_from_icon_name(Gtk.EntryIconPosition.PRIMARY, "dialog-information-symbolic");
+        ent.set_icon_tooltip_markup(Gtk.EntryIconPosition.PRIMARY, "Specify a port after a hostname by separating with a \":\"\nUse a \"+\" symbol before the port to indicate SSL is required");
+        combo.hexpand = true;
+        grid.attach(combo, 1, row, 2, 1);
+
+        editbtn = new Gtk.Button.from_icon_name("edit-symbolic", Gtk.IconSize.MENU);
+        editbtn.set_relief(Gtk.ReliefStyle.NONE);
+        grid.attach(editbtn, 3, row, 1, 1);
+
+        ++row;
+
+        label = new Gtk.Label("Channels");
+        label.halign = Gtk.Align.END;
+        grid.attach(label, 0, row, 1, 1);
+        var entry = new Gtk.Entry();
+        grid.attach(entry, 1, row, 2, 1);
+        entry.set_icon_from_icon_name(Gtk.EntryIconPosition.PRIMARY, "dialog-information-symbolic");
+        var lbl = """Enter a list of channels you wish to autojoin""";/*
+If you wish to type a password for a channel,
+use a colon to separate the channel name:
+
+#somechannel:secret #someotherchannel""";*/
+        entry.set_icon_tooltip_markup(Gtk.EntryIconPosition.PRIMARY, lbl);
+        ++row;
+        ++row;
+
+        connectbtn = new Gtk.Button.with_label("Connect");
+        connectbtn.hexpand = false;
+        connectbtn.halign = Gtk.Align.END;
+        connectbtn.get_style_context().add_class("suggested-action");
+        connectbtn.set_sensitive(false);
+        grid.attach(connectbtn, 2, row, 1, 1);
+        connectbtn.clicked.connect(()=> {
+            this.activated(this.network);
+        });
+
+        combo.changed.connect(on_changed);
+
+        editbtn.set_sensitive(false);
+        editbtn.clicked.connect(()=> {
+            this.edit(this.network);
+        });
+        combo.changed();
     }
 }
 
