@@ -235,7 +235,15 @@ window.
 
     private void update_actions()
     {
-        (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected);
+        (application.lookup_action("join_channel") as SimpleAction).set_enabled(core != null && core.connected && stack.get_visible_child_name() != "connect");
+
+        if (stack.get_visible_child_name() == "connect") {
+            (application.lookup_action("add_server") as SimpleAction).set_enabled(true);
+            (application.lookup_action("connect") as SimpleAction).set_enabled(false);
+        } else {
+            (application.lookup_action("add_server") as SimpleAction).set_enabled(false);
+            (application.lookup_action("connect") as SimpleAction).set_enabled(true);
+        }
     }
 
     private void connect_server(IrcNetwork? network)
@@ -861,16 +869,19 @@ window.
                 return false;
             });
         });
+        action.set_enabled(false);
         application.add_action(action);
         /* connect to server. */
         action = new SimpleAction("connect", null);
         action.activate.connect(()=> {
             queue_draw();
             Idle.add(()=> {
-                show_connect_dialog();
+                stack.set_visible_child_name("connect");
+                update_actions();
                 return false;
             });
         });
+        action.set_enabled(false);
         application.add_action(action);
         /* add server, only available on connect page.. */
         action = new SimpleAction("add_server", null);
@@ -936,8 +947,6 @@ window.
         paction = new PropertyAction("dark_theme", get_settings(), "gtk-application-prefer-dark-theme");
         application.add_action(paction);
 
-        update_actions();
-
         set_icon_name("quirky");
 
         stack = new Gtk.Stack();
@@ -948,6 +957,7 @@ window.
         connect.edit.connect(on_network_edit);
         connect.closed.connect(()=> {
             this.stack.set_visible_child_name("main");
+            update_actions();
         });
         stack.add_named(connect, "connect");
         var main_layout = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
@@ -1081,6 +1091,7 @@ window.
 
 
         insert_disclaimer();
+        stack.set_visible_child_name("connect");
         /*
         Idle.add(()=> {
             show_connect_dialog();
@@ -1093,6 +1104,7 @@ window.
         stack.set_visible_child_name("main");
         network.channels = channels;
         connect_server(network);
+            update_actions();
     }
 
     void on_network_edit(IrcNetwork? network)
@@ -1893,12 +1905,24 @@ use a colon to separate the channel name:
         ++row;
         ++row;
 
+
+        var btn = new Gtk.Button.with_label("Cancel");
+        btn.clicked.connect(()=> {
+            this.closed();
+        });
+        btn.margin_right = 4;
+
+        var box = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
+        box.hexpand = false;
+        box.halign = Gtk.Align.END;
+        box.pack_start(btn, false, false, 0);
+        grid.attach(box, 2, row, 1, 1);
+
         connectbtn = new Gtk.Button.with_label("Connect");
-        connectbtn.hexpand = false;
-        connectbtn.halign = Gtk.Align.END;
+
         connectbtn.get_style_context().add_class("suggested-action");
         connectbtn.set_sensitive(false);
-        grid.attach(connectbtn, 2, row, 1, 1);
+        box.pack_start(connectbtn, false, false, 0);
         connectbtn.clicked.connect(()=> {
             this.activated(this.network, this.channels.text.split(" "));
         });
