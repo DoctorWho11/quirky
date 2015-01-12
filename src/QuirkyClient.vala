@@ -113,6 +113,7 @@ window.
         if (!FileUtils.test(path, FileTest.EXISTS)) {
             return;
         }
+        IrcNetwork[] networks = {};
 
         try {
             settings.load_from_file(path, KeyFileFlags.NONE);
@@ -130,9 +131,109 @@ window.
                 b = settings.get_boolean("UI", "EnableDarkTheme");
                 get_settings().set_property("gtk-application-prefer-dark-theme", b);
             }
+/*
+public struct IrcServer {
+    string hostname;
+    uint16 port;
+    bool ssl;
+}
+
+public struct IrcNetwork {
+    string name;
+    string username;
+    string gecos;
+    string nick1;
+    string nick2;
+    string nick3;
+    IrcServer[] servers;
+    string[] channels;
+    string password;
+    AuthenticationMode auth;
+}*/
+
+            foreach (var section in settings.get_groups()) {
+                if (!section.has_prefix("network:")) {
+                    continue;
+                }
+                IrcNetwork n = IrcNetwork();
+                n.name = section.split("network:")[1];
+                if (!settings.has_key(section, "Hosts")) {
+                    warning("Invalid network config: %s (no host)", n.name);
+                    continue;
+                }
+                string[] hosts = settings.get_string_list(section, "Hosts");
+                /* no cycle server handling yet. */
+                var host = hosts[0];
+                var port = 6667;
+                bool ssl = false;
+                if (":" in host) {
+                    var rhost = host.split(":");
+                    host = rhost[0];
+                    if (rhost[1].has_prefix("+")) {
+                        ssl = true;
+                        port = int.parse(rhost[1].substring(1));
+                    } else {
+                        port  = int.parse(rhost[1]);
+                    }
+                }
+                n.servers = new IrcServer[] {
+                    IrcServer() {
+                        hostname = host,
+                        port = (uint16)port,
+                        ssl = ssl
+                    }
+                };
+                if (settings.has_key(section, "Nick1")) {
+                    n.nick1 = settings.get_string(section, "Nick1");
+                } else {
+                    n.nick1 = "quirkyclient";
+                }
+                n.nick2 = n.nick1 + "_";
+                n.nick3 = n.nick1 + "__";
+                if (settings.has_key(section, "Gecos")) {
+                    n.gecos = settings.get_string(section, "Gecos");
+                } else {
+                    n.gecos = "Quirky User";
+                }
+                if (settings.has_key(section, "Username")) {
+                    n.username = settings.get_string(section, "Username");
+                } else {
+                    n.username = "quirky";
+                }
+                if (settings.has_key(section, "Channels")) {
+                    n.channels = settings.get_string_list(section, "Channels");
+                } else {
+                    n.channels = new string[] { };
+                }
+
+                networks += n;
+            }
+
         } catch (Error e) {
             warning("Badly handled error: %s", e.message);
         }
+
+        if (networks.length > 0) {
+            foreach (var net in networks) {
+                this.connect_view.add_network(net);
+            }
+        } else {
+            /* Please humbly accept this default :P */
+            var n = IrcNetwork() {
+                        name = "freenode",
+                        username = Environment.get_user_name(),
+                        gecos = "quirkyclient",
+                        nick1 = "quirkyclient",
+                        nick2 = "quirkyclient_",
+                        nick3 = "quirkyclient__",
+                        servers = new IrcServer[] {
+                            IrcServer() { hostname = "irc.freenode.net", port = 6667, ssl = false }
+                        },
+                        channels = new string[] { "#evolveos" }
+            };
+            this.connect_view.add_network(n);
+        }
+
     }
 
     private void flush_settings()
@@ -603,6 +704,9 @@ window.
         main_view = new IrcTextWidget(_colors);
         main_view.use_timestamp = true;
 
+        var connect = new NetworkListView();
+        this.connect_view = connect;
+
         init_settings();
 
         commands = new HashTable<string,Command?>(str_hash, str_equal);
@@ -859,8 +963,6 @@ window.
         stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT);
         add(stack);
 
-        var connect = new NetworkListView();
-        this.connect_view = connect;
         connect.activated.connect(on_network_select);
         connect.edit.connect(on_network_edit);
         connect.closed.connect(()=> {
@@ -1633,9 +1735,10 @@ public class NetworkListView : Gtk.Box
         }
 
         networks[network.name] = network;
-        if (this.network.name == network.name) {
+        if (this.network != null && this.network.name == network.name) {
             this.network = network;
         }
+        combo.set_active_id(network.name);
     }
 
     public void remove_network(IrcNetwork network)
@@ -1716,19 +1819,6 @@ public class NetworkListView : Gtk.Box
 
         networks = new HashTable<string,IrcNetwork?>(str_hash, str_equal);
 
-        networks["freenode"] = IrcNetwork() {
-            name = "freenode",
-            username = Environment.get_user_name(),
-            gecos = "quirkyclient",
-            nick1 = "quirkyclient",
-            nick2 = "quirkyclient_",
-            nick3 = "quirkyclient__",
-            servers = new IrcServer[] {
-                IrcServer() { hostname = "irc.freenode.net", port = 6667, ssl = false }
-            },
-            channels = new string[] { "#evolveos" }
-        };
-
         var grid = new Gtk.Grid();
         grid.halign = Gtk.Align.CENTER;
         grid.valign = Gtk.Align.CENTER;
@@ -1752,9 +1842,6 @@ public class NetworkListView : Gtk.Box
         grid.attach(label, 0, row, 1, 1);
 
         combo = new Gtk.ComboBoxText.with_entry();
-        combo.append("default", "freenode");
-        combo.active_id = "default";
-
         var ent = combo.get_child() as Gtk.Entry;
         ent.set_icon_from_icon_name(Gtk.EntryIconPosition.PRIMARY, "dialog-information-symbolic");
         ent.set_icon_tooltip_markup(Gtk.EntryIconPosition.PRIMARY, "Specify a port after a hostname by separating with a \":\"\nUse a \"+\" symbol before the port to indicate SSL is required");
@@ -1798,7 +1885,6 @@ use a colon to separate the channel name:
         editbtn.clicked.connect(()=> {
             this.edit(this.network);
         });
-        combo.changed();
     }
 }
 
