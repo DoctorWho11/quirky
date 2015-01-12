@@ -1088,9 +1088,10 @@ window.
         });*/
     }
 
-    void on_network_select(IrcNetwork? network)
+    void on_network_select(IrcNetwork? network, string[] channels)
     {
         stack.set_visible_child_name("main");
+        network.channels = channels;
         connect_server(network);
     }
 
@@ -1734,7 +1735,7 @@ public struct IrcNetwork {
 public class NetworkListView : Gtk.Box
 {
 
-    public signal void activated(IrcNetwork? network);
+    public signal void activated(IrcNetwork? network, string[] channels);
     public signal void edit(IrcNetwork? network);
     public signal void closed();
 
@@ -1743,6 +1744,7 @@ public class NetworkListView : Gtk.Box
     Gtk.Button connectbtn;
     Gtk.Button editbtn;
     Gtk.ComboBoxText combo;
+    Gtk.Entry channels;
 
     public void add_network(IrcNetwork network)
     {
@@ -1775,6 +1777,11 @@ public class NetworkListView : Gtk.Box
             this.network = networks[active];
             connectbtn.set_sensitive(true);
             editbtn.set_sensitive(true);
+            if (network.channels != null) {
+                this.channels.set_text(string.joinv(" ", network.channels));
+            } else {
+                this.channels.set_text("");
+            }
             return;
         }
         editbtn.set_sensitive(false);
@@ -1874,6 +1881,7 @@ public class NetworkListView : Gtk.Box
         label.halign = Gtk.Align.END;
         grid.attach(label, 0, row, 1, 1);
         var entry = new Gtk.Entry();
+        channels = entry;
         grid.attach(entry, 1, row, 2, 1);
         entry.set_icon_from_icon_name(Gtk.EntryIconPosition.PRIMARY, "dialog-information-symbolic");
         var lbl = """Enter a list of channels you wish to autojoin""";/*
@@ -1892,7 +1900,7 @@ use a colon to separate the channel name:
         connectbtn.set_sensitive(false);
         grid.attach(connectbtn, 2, row, 1, 1);
         connectbtn.clicked.connect(()=> {
-            this.activated(this.network);
+            this.activated(this.network, this.channels.text.split(" "));
         });
 
         combo.changed.connect(on_changed);
