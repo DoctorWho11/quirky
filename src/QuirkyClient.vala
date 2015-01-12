@@ -131,25 +131,6 @@ window.
                 b = settings.get_boolean("UI", "EnableDarkTheme");
                 get_settings().set_property("gtk-application-prefer-dark-theme", b);
             }
-/*
-public struct IrcServer {
-    string hostname;
-    uint16 port;
-    bool ssl;
-}
-
-public struct IrcNetwork {
-    string name;
-    string username;
-    string gecos;
-    string nick1;
-    string nick2;
-    string nick3;
-    IrcServer[] servers;
-    string[] channels;
-    string password;
-    AuthenticationMode auth;
-}*/
 
             foreach (var section in settings.get_groups()) {
                 if (!section.has_prefix("network:")) {
@@ -1402,11 +1383,46 @@ public struct IrcNetwork {
              };
              if (old != null) {
                  connect_view.remove_network(old);
+                 try {
+                    if (settings.has_group("network:" + old.name)) {
+                        settings.remove_group("network:" + old.name);
+                    }
+                 } catch (Error e) {
+                     warning("Badly handled config error: %s", e.message);
+                 }
              }
+
+             save_network(n);
              connect_view.add_network(n);
         }
         dlg.destroy();
         input.grab_focus();
+    }
+
+    void save_network(IrcNetwork n)
+    {
+        try {
+            var sect = "network:" + n.name;
+            if (settings.has_group(sect)) {
+                settings.remove_group(sect);
+            }
+
+            string host1 = n.servers[0].hostname + ":";
+            if (n.servers[0].ssl) {
+                host1 += "+";
+            }
+            string[] hosts = {};
+            host1 += n.servers[0].port.to_string();
+            hosts += host1;
+            settings.set_string_list(sect, "Hosts", hosts);
+            settings.set_string(sect, "Nick1", n.nick1);
+            settings.set_string(sect, "Gecos", n.gecos);
+            settings.set_string(sect, "Username", n.username);
+            settings.set_string_list(sect, "Channels", n.channels);
+        } catch (Error e) {
+            warning("Badly handled error: %s", e.message);
+        }
+        flush_settings();
     }
 
     /**

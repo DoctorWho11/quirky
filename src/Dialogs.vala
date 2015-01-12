@@ -156,7 +156,13 @@ public class ConnectDialog : Gtk.Dialog
         grid.attach(label, column, row, norm_size, norm_size);
         entry = new Gtk.Entry();
         nick_ent = entry;
-        entry.text = Environment.get_user_name();
+        entry.changed.connect(()=> {
+            do_validate(false);
+        });
+        entry.activate.connect(()=> {
+            do_validate(true);
+        });
+
         entry.hexpand = true;
         grid.attach(entry, column+1, row, max_size-1, norm_size);
 
@@ -166,7 +172,9 @@ public class ConnectDialog : Gtk.Dialog
         grid.attach(label, column, row, norm_size, norm_size);
         entry = new Gtk.Entry();
         username_ent = entry;
-        entry.text = Environment.get_user_name();
+        entry.changed.connect(()=> {
+            do_validate(false);
+        });
         entry.hexpand = true;
         grid.attach(entry, column+1, row, max_size-1, norm_size);
 
@@ -176,17 +184,11 @@ public class ConnectDialog : Gtk.Dialog
         grid.attach(label, column, row, norm_size, norm_size);
         entry = new Gtk.Entry();
         gecos_ent = entry;
-        entry.text = Environment.get_user_name();
-        entry.hexpand = true;
-        grid.attach(entry, column+1, row, max_size-1, norm_size);
-
-        /* Nick validation.. */
         entry.changed.connect(()=> {
             do_validate(false);
         });
-        entry.activate.connect(()=> {
-            do_validate(true);
-        });
+        entry.hexpand = true;
+        grid.attach(entry, column+1, row, max_size-1, norm_size);
 
         row++;
         /* channel */
@@ -272,7 +274,13 @@ public class ConnectDialog : Gtk.Dialog
                 channel = "";
             }
             do_validate(false);
+        } else {
+            var name = Environment.get_user_name();
+            nick_ent.set_text(name);
+            username_ent.set_text(name);
+            gecos_ent.set_text(name);
         }
+
         grid.margin_bottom = 6;
 
     }
