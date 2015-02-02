@@ -80,23 +80,23 @@ public class QuirkyClient : Gtk.ApplicationWindow
     {
         var buffer = new Gtk.TextBuffer(main_view.tags);
         string msg = """
-This is barely alpha software, and may eat your cat, hamster or other cute pets.
+                         o8o           oooo
+                         `"'           `888
+  .ooooo oo oooo  oooo  oooo  oooo d8b  888  oooo  oooo    ooo
+ d88' `888  `888  `888  `888  `888""8P  888 .8P'    `88.  .8'
+ 888   888   888   888   888   888      888888.      `88..8'
+ 888   888   888   888   888   888      888 `88b.     `888'
+ `V8bod888   `V88V"V8P' o888o d888b    o888o o888o     .8'
+       888.                                        .o..P'
+       8P'                                         `Y8P'
+       "
 
-Note that many features are not yet implemented, so here is a heads up:
 
- * STARTTLS is currently disabled until CAP is implemented
- * SSL connection will accept all certificates by default right now.
- * For implemented commands, type /HELP
- * Unimplemented commands can be bypassed with /QUOTE, but may cause issues!!
- * Missing modes, kick support, etc.
-    
-Please enjoy testing, and report any bugs that you find!
-This message won't be in the final versions :)
+  ↠ Pre-alpha
+  ↠ No SSL verification
+  ↠ Per the name, quirky.
 
-In the mean time, connect to a network using the button at the top left of this
-window.
-
- - ufee1dead """;
+                                          - ufee1dead """;
 
         foreach (var line in msg.split("\n")) {
             main_view.add_message(buffer, null, _M(MSG.DISCLAIM), line);
