@@ -1016,6 +1016,7 @@ public class QuirkyClient : Gtk.ApplicationWindow
             nick_button.set_active(false);
             nick_button.thaw_notify();
             entry.set_text("");
+            pop.hide();
         });
         pop.border_width = 10;
         pop.add(entry);
