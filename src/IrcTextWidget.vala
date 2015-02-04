@@ -75,6 +75,15 @@ public class IrcTextWidget : Gtk.TextView
         return b;
     }
 
+    public Pango.FontDescription? font_desc {
+        public set {
+            tags.lookup("default").font_desc = value;
+        }
+        public owned get {
+            return tags.lookup("default").font_desc;
+        }
+    }
+
     /**
      * Let us click URIs
      */
@@ -167,8 +176,6 @@ public class IrcTextWidget : Gtk.TextView
         w = 1;
     }
 
-    bool custom_font = false;
-
     public IrcTextWidget(HashTable<string,string> colors)
     {
         set_wrap_mode(Gtk.WrapMode.WORD_CHAR);
@@ -182,7 +189,6 @@ public class IrcTextWidget : Gtk.TextView
         tags = new Gtk.TextTagTable();
         var tag = new Gtk.TextTag("default");
         tag.font_desc = Pango.FontDescription.from_string("Monospace 10");
-        custom_font = true;
         tags.add(tag);
 
         tag = new Gtk.TextTag("nickname");
@@ -592,7 +598,7 @@ public class IrcTextWidget : Gtk.TextView
         }
 
         var ctx = get_pango_context();
-        Pango.FontDescription? desc = custom_font ? tags.lookup("default").font_desc : null;
+        Pango.FontDescription? desc = tags.lookup("default").font_desc;
         var mtx = ctx.get_metrics(desc, null);
         var charwidth = max(mtx.get_approximate_char_width(), mtx.get_approximate_digit_width());
         var pxwidth = (int) Pango.units_to_double(charwidth);

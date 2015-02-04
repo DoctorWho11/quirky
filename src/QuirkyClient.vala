@@ -131,6 +131,11 @@ public class QuirkyClient : Gtk.ApplicationWindow
                 b = settings.get_boolean("UI", "EnableDarkTheme");
                 get_settings().set_property("gtk-application-prefer-dark-theme", b);
             }
+            if (settings.has_key("UI", "Font")) {
+                var s = settings.get_string("UI", "Font");
+                var f = Pango.FontDescription.from_string(s);
+                main_view.font_desc = f;
+            }
 
             foreach (var section in settings.get_groups()) {
                 if (!section.has_prefix("network:")) {
@@ -920,6 +925,29 @@ public class QuirkyClient : Gtk.ApplicationWindow
         });
         application.add_action(action);
 
+        action = new SimpleAction("font", null);
+        action.activate.connect(()=> {
+            queue_draw();
+            Idle.add(()=> {
+                var d = new Gtk.FontChooserDialog("Text font", this);
+                d.set_font_desc(main_view.font_desc);
+                if (d.run() != Gtk.ResponseType.OK) {
+                    d.close();
+                    return false;
+                }
+                d.close();
+
+                var fd = d.get_font_desc();
+                if (fd != null) {
+                    main_view.font_desc = fd;
+                    settings.set_string("UI", "Font", fd.to_string());
+                    flush_settings();
+                }
+                return false;
+            });
+        });
+        application.add_action(action);
+
         btn = new Gtk.MenuButton();
         img = new Gtk.Image.from_icon_name("emblem-system-symbolic", Gtk.IconSize.BUTTON);
         btn.add(img);
@@ -933,6 +961,7 @@ public class QuirkyClient : Gtk.ApplicationWindow
         menu.append("Show timestamps", "app.timestamps");
         submenu.append("Show margin", "app.margin");
         submenu.append("Use dark theme", "app.dark_theme");
+        submenu.append("Font", "app.font");
 
         submenu = new Menu();
         menu.append_section(null, submenu);
