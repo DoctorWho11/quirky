@@ -13,3 +13,9 @@
 .count-item.non-urgent {
     background-color: grey;
 }
+
+.sidebar-item:selected,
+.sidebar-header:selected {
+    background-color: @selected_bg_color;
+    color: @selected_fg_color;
+}
