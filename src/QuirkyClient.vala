@@ -1664,7 +1664,7 @@ public class QuirkyClient : Gtk.ApplicationWindow
     protected void on_messaged(IrcCore core, IrcUser user, string target, string message, IrcMessageType type)
     {
         Gtk.TextBuffer? buffer;
-
+        bool highlight = is_highlight(core, message);
         if ((type & IrcMessageType.PRIVATE) != 0) {
             /* private message.. */
             buffer = get_named_buffer(core, user.nick);
@@ -1674,7 +1674,7 @@ public class QuirkyClient : Gtk.ApplicationWindow
                 SidebarItem? item = buffer.get_data("sitem");
                 item.count.count++;
                 /* Add better highlighting logic in future */
-                if (is_highlight(core, message)) {
+                if (highlight) {
                     item.count.priority = CountPriority.HIGH;
                 }
             }
@@ -1683,15 +1683,15 @@ public class QuirkyClient : Gtk.ApplicationWindow
             if (target != this.target) {
                 SidebarItem? item = buffer.get_data("sitem");
                 item.count.count++;
-                if (is_highlight(core, message)) {
+                if (highlight) {
                     item.count.priority = CountPriority.HIGH;
                 }
             }
         }
         if ((type & IrcMessageType.ACTION) != 0) {
-            main_view.add_message(buffer, user.nick, _M(MSG.ACTION), user.nick, message);
+            main_view.add_message(buffer, user.nick, _M(highlight ? MSG.ACTION_HIGHLIGHT : MSG.ACTION), user.nick, message);
         } else {
-            main_view.add_message(buffer, user.nick, _M(MSG.MESSAGE), user.nick, message);
+            main_view.add_message(buffer, user.nick, _M(highlight ? MSG.MESSAGE_HIGHLIGHT : MSG.MESSAGE), user.nick, message);
         }
     }
 
