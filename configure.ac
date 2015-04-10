@@ -1,4 +1,4 @@
-AC_INIT([Quirky IRC Client], 1, [ikey@evolve-os.com], [quirky], [https://evolve-os.com/])
+AC_INIT([Quirky IRC Client], 1, [ikey@solus-project.com], [quirky], [https://solus-project.com/])
 AM_INIT_AUTOMAKE([-Wno-portability no-dist-gzip dist-xz foreign subdir-objects])
 AC_PROG_CC
 AC_PROG_CC_STDC

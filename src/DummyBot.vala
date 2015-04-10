@@ -1,7 +1,7 @@
 /*
  * DummyBot.vala
  * 
- * Copyright 2014 Ikey Doherty <ikey@evolve-os.com>
+ * Copyright 2014 Ikey Doherty <ikey@solus-project.com>
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -136,10 +136,10 @@ public class DummyBot
                         irc.send_message(target, @"$(user.nick): PONG!");
                         break;
                     case "forums":
-                        irc.send_message(target, "Evolve OS Forums: https://evolve-os.com/forums/");
+                        irc.send_message(target, "Evolve OS Forums: https://solus-project.com/forums/");
                         break;
                     case "wiki":
-                        irc.send_message(target, "Evolve OS Wiki: https://evolve-os.com/wiki");
+                        irc.send_message(target, "Evolve OS Wiki: https://solus-project.com/wiki");
                         break;
                     default:
                         irc.send_message(target, @"LOL $(user.nick) thought we was a real bot.");

@@ -1,7 +1,7 @@
 /*
  * IrcCore.vala
  * 
- * Copyright 2014 Ikey Doherty <ikey@evolve-os.com>
+ * Copyright 2014 Ikey Doherty <ikey@solus-project.com>
  *
  * This example is provided for an initial proof-of-concept of blocking I/O
  * on IRC in Vala. It will survive here a little longer to ensure we never

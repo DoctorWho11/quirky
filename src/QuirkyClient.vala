@@ -1,7 +1,7 @@
 /*
  * QuirkyClient.vala
  * 
- * Copyright 2014 Ikey Doherty <ikey@evolve-os.com>
+ * Copyright 2014 Ikey Doherty <ikey@solus-project.com>
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -906,8 +906,8 @@ public class QuirkyClient : Gtk.ApplicationWindow
                 Gtk.show_about_dialog(this,
                     "program-name", "Quirky IRC Client",
                     "copyright", "Copyright \u00A9 2015 Ikey Doherty",
-                    "website", "https://evolve-os.com",
-                    "website-label", "Evolve OS",
+                    "website", "https://solus-project.com",
+                    "website-label", "Solus Project",
                     "license-type", Gtk.License.GPL_2_0,
                     "comments", "IRC client for people who use IRC",
                     "version", "1",
@@ -916,7 +916,7 @@ public class QuirkyClient : Gtk.ApplicationWindow
                         "Alejandro Seoane <asetrigo@gmail.com>"
                     },
                     "authors", new string[] {
-                        "Ikey Doherty <ikey@evolve-os.com>"
+                        "Ikey Doherty <ikey@solus-project.com>"
                     }
                 );
                 input.grab_focus();
