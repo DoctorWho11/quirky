@@ -425,12 +425,18 @@ public class IrcCore : Object
     {
         /* Prevent early registration with TLS enabled */
         if (tls_pending) {
+#if WINDOWSBUILD
+            message("TLS_PENDING");
+#endif
             return;
         }
         write_socket("CAP LS\r\n");
         write_socket("USER %s %d * :%s\r\n", ident.username, ident.mode, ident.gecos);
         write_socket("NICK %s\r\n", ident.nick);
         registered = true;
+#if WINDOWSBUILD
+        message("REGISTERED");
+#endif
     }
 
     TlsClientConnection? tls;
@@ -536,6 +542,9 @@ public class IrcCore : Object
             bool remove = false;
             try {
                 remove = dos.put_string(next);
+#if WINDOWSBUILD
+                message("FLUSHED(%s): %s", next, remove ? "YES" : "NO");
+#endif
                 dos.flush();
             } catch (Error e) {
                 warning("Encountered I/O Error!");
@@ -561,7 +570,9 @@ public class IrcCore : Object
 
         lock (outm) {
             out_q.push_tail(line);
-
+#if WINDOWSBUILD
+            message("PUSHING: %s", line);
+#endif
             /* No current dispatch callback, set it up */
             if (out_s == 0) {
                 out_s = ioc.add_watch(IOCondition.OUT | IOCondition.HUP, dispatcher);
