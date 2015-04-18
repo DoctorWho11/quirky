@@ -516,6 +516,9 @@ public class IrcCore : Object
 
     protected bool dispatcher(IOChannel source, IOCondition cond)
     {
+#if WINDOWSBUILD
+        message("ENTER_dispatcher");
+#endif
         if (cond == IOCondition.HUP) {
             lock (outm) {
                 out_s = 0;
