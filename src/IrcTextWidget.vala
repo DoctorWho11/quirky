@@ -184,7 +184,7 @@ public class IrcTextWidget : Gtk.TextView
 
         visible_margin = true;
 
-        _link = new Gdk.Cursor(Gdk.CursorType.HAND1);
+        _link = new Gdk.Cursor.for_display(Gdk.Screen.get_default().get_display(), Gdk.CursorType.HAND1);
 
         tags = new Gtk.TextTagTable();
         var tag = new Gtk.TextTag("default");
