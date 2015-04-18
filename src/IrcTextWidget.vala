@@ -270,7 +270,7 @@ public class IrcTextWidget : Gtk.TextView
             timestamp_length = stamp.length;
         }
 
-        buf.insert_with_tags_by_name(i, stamp, -1, "timestamp", "default");
+        buf.insert_with_tags_by_name(ref i, stamp, -1, "timestamp", "default");
     }
 
     int get_nick_color(string whom)
@@ -517,7 +517,7 @@ public class IrcTextWidget : Gtk.TextView
             buf.get_end_iter(out it);
             int start = it.get_offset();
 
-            buf.insert_with_tags_by_name(it, b.str, -1, "default");
+            buf.insert_with_tags_by_name(ref it, b.str, -1, "default");
             buf.get_end_iter(out it);
             int end = it.get_offset();
 
@@ -529,7 +529,7 @@ public class IrcTextWidget : Gtk.TextView
 
             iters = null;
             buf.get_end_iter(out it);
-            buf.insert_with_tags_by_name(it, "\n", -1, "default");
+            buf.insert_with_tags_by_name(ref it, "\n", -1, "default");
   
             /* Process URLs (string sanitised by prior mirc run. */
             var urls = get_urls(b.str);
