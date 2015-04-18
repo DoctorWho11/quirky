@@ -572,15 +572,21 @@ public class IrcCore : Object
         string line = fmt.vprintf(va);
 
         lock (outm) {
-            out_q.push_tail(line);
 #if WINDOWSBUILD
             message("PUSHING: %s", line);
-#endif
+            try {
+                dos.put_string(line);
+            } catch (Error e) {
+                warning("Encountered I/O Error!");
+            }
+#else
+            out_q.push_tail(line);
             /* No current dispatch callback, set it up */
             if (out_s == 0) {
                 out_s = ioc.add_watch(IOCondition.OUT | IOCondition.HUP, dispatcher);
             }
         }
+#endif
     }
 
     /**
