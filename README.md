@@ -14,14 +14,23 @@ Currently under heavy development!
 
 Important
 --------
-The core library is missing a ton of checks, so wil likely crash in some
-situations.  ircfuzz kills it instantly.  Also note there is NO SSL validation
-and all certificates are accepted!
+Note there is NO SSL validation and all certificates are accepted!
+Quirky currently stands up to ircfuzz without issue. Please inform us
+if this changes.
 
 License
 ------
 
 GPLv2
+
+TODO
+-----
+
+ * Lots.
+ * Replace queue scheduling with throttled independent queues
+ * Ensure that works on Windows too.
+ * Get a distributable Windows build out
+
 
 Versioning
 ---------
