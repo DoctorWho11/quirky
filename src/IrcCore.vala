@@ -585,8 +585,8 @@ public class IrcCore : Object
             if (out_s == 0) {
                 out_s = ioc.add_watch(IOCondition.OUT | IOCondition.HUP, dispatcher);
             }
-        }
 #endif
+        }
     }
 
     /**
