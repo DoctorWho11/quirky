@@ -25,9 +25,11 @@ AM_CONDITIONAL([BUILD_WINDOWS], [test x$enable_windows_build = x"yes"])
 
 if test "x$enable_windows_build" = "xyes"; then
     VALAFLAGS="--define WINDOWSBUILD"
+    WINFLAGS="-mwindows"
 fi
 
 AC_SUBST(VALAFLAGS)
+AC_SUBST(WINFLAGS)
 
 AC_PATH_PROG(GLIB_COMPILE_RESOURCES, glib-compile-resources)
 

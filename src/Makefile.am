@@ -56,7 +56,8 @@ quirky_SOURCES = \
 quirky_CFLAGS = \
 	$(GOBJECT_CFLAGS) \
 	$(GIO_CFLAGS) \
-	$(GTK_CFLAGS)
+	$(GTK_CFLAGS) \
+	$(WINFLAGS)
 
 quirky_LDADD = \
 	$(GOBJECT_LIBS) \
