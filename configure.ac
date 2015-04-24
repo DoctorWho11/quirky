@@ -24,6 +24,9 @@ AS_IF([test "x$enable_windows_build" = "xyes"],
 AM_CONDITIONAL([BUILD_WINDOWS], [test x$enable_windows_build = x"yes"])
 
 if test "x$enable_windows_build" = "xyes"; then
+    if test "$WINDRES" = no; then
+        AC_MSG_ERROR([*** Could not find an implementation of windres in your PATH.])
+    fi
     VALAFLAGS="--define WINDOWSBUILD"
     WINFLAGS="-mwindows"
 fi
@@ -38,7 +41,8 @@ AM_PROG_VALAC([0.24], [], [AC_MSG_ERROR([valac is required to build Quirky])])
 
 AC_CONFIG_FILES([Makefile
                  data/Makefile
-                 src/Makefile])
+                 src/Makefile
+                 src/quirky.rc])
 AC_OUTPUT
 
 AC_MSG_RESULT([

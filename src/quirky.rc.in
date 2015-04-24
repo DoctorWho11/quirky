@@ -1,0 +1,23 @@
+1 24 quirky.exe.manifest
+QUIRKY_ICON ICON "../data/quirky.ico"
+
+VS_VERSION_INFO VERSIONINFO
+	FILEVERSION    1,0,0,0
+	PRODUCTVERSION 1,0,0,0
+	BEGIN
+		BLOCK "StringFileInfo"
+		BEGIN
+			BLOCK "040904B0"
+			BEGIN
+
+				VALUE "FileDescription", "Quirky IRC Client"
+				VALUE "ProductName", "Quirky"
+				VALUE "ProductVersion", "1.0.0.0"
+				VALUE "FileVersion", "1.0.0.0"
+			END
+		END
+		BLOCK "VarFileInfo"
+		BEGIN
+			VALUE "Translation", 0x0409, 0x04B0
+		END
+	END

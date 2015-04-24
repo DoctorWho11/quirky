@@ -16,7 +16,8 @@ EXTRA_DIST = \
 	quirky-512x512.png \
 	quirky-64x64.png \
 	quirky-72x72.png \
-	quirky-96x96.png
+	quirky-96x96.png \
+	quirky.ico
 
 # Our .desktop file
 desktopdir=$(datadir)/applications
@@ -45,11 +46,11 @@ install-icons:
 		mkdir -p $(DESTDIR)$(datadir)/icons/hicolor/$$iconsize/apps; \
 		$(INSTALL_DATA) $(srcdir)/quirky-$$iconsize.png $(DESTDIR)$(datadir)/icons/hicolor/$$iconsize/apps/quirky.png; \
 	done
-	
+
 uninstall-icons:
 	for iconsize in $(icon_sizes); do \
 		rm $(DESTDIR)$(datadir)/icons/hicolor/$$iconsize/apps/quirky.png; \
 	done
-	
+
 install-data-local: install-icons
 uninstall-local: uninstall-icons
