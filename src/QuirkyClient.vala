@@ -1260,7 +1260,7 @@ public class QuirkyClient : Gtk.ApplicationWindow
             nlist.get(iter, 1, out u, -1);
             if (u.nick == user.nick) {
                 /* Found him. */
-                nlist.remove(iter);
+                nlist.remove(ref iter);
                 return true;
             }
             if (!nlist.iter_next(ref iter)) {
